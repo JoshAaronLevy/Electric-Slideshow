@@ -17,9 +17,13 @@ struct AlbumListView: View {
             if viewModel.isLoading {
                 ProgressView("Loading albums...")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let errorMessage = viewModel.errorMessage {
+            } else if viewModel.error != nil {
                 VStack(spacing: 16) {
-                    Text(errorMessage)
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 48))
+                        .foregroundColor(.orange)
+                    
+                    Text(viewModel.errorMessage ?? "An error occurred")
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                         .padding()
@@ -29,6 +33,7 @@ struct AlbumListView: View {
                             await viewModel.requestAuthorization()
                         }
                     }
+                    .buttonStyle(.borderedProminent)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if viewModel.albums.isEmpty {

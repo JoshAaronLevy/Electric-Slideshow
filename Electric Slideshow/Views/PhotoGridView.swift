@@ -21,8 +21,20 @@ struct PhotoGridView: View {
         Group {
             if let album = album {
                 if viewModel.isLoading {
-                    ProgressView("Loading photos...")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    VStack(spacing: 16) {
+                        ProgressView("Loading photos...")
+                            .progressViewStyle(.linear)
+                        Text("Fetching \(album.assetCount) photos")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if let error = viewModel.error {
+                    ContentUnavailableView(
+                        "Failed to Load",
+                        systemImage: "exclamationmark.triangle",
+                        description: Text(error.errorDescription ?? "An error occurred")
+                    )
                 } else if viewModel.photos.isEmpty {
                     ContentUnavailableView(
                         "No Photos",
@@ -44,6 +56,24 @@ struct PhotoGridView: View {
                         }
                         .padding()
                     }
+                    
+                    // Show loading progress when thumbnails are loading
+                    if viewModel.loadingProgress > 0 && viewModel.loadingProgress < 1.0 {
+                        VStack {
+                            Spacer()
+                            HStack {
+                                ProgressView(value: viewModel.loadingProgress) {
+                                    Text("Loading thumbnails... \(Int(viewModel.loadingProgress * 100))%")
+                                        .font(.caption)
+                                }
+                                .frame(maxWidth: 300)
+                                .padding()
+                                .background(.ultraThinMaterial)
+                                .cornerRadius(8)
+                            }
+                            .padding(.bottom)
+                        }
+                    }
                 }
             } else {
                 ContentUnavailableView(
@@ -54,8 +84,9 @@ struct PhotoGridView: View {
             }
         }
         .navigationTitle(album?.title ?? "Photos")
+        .navigationSubtitle(album.map { "\($0.assetCount) photos" } ?? "")
         .sheet(item: $selectedPhoto) { photo in
-            PhotoDetailView(photo: photo, viewModel: viewModel)
+            PhotoDetailView(photo: photo, photoService: viewModel)
         }
         .onChange(of: album) { oldValue, newValue in
             if let newAlbum = newValue {
@@ -81,16 +112,19 @@ struct PhotoThumbnailView: View {
                     .frame(width: 150, height: 150)
                     .clipped()
                     .cornerRadius(8)
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
             } else {
                 Rectangle()
-                    .fill(Color.gray.opacity(0.3))
+                    .fill(Color.gray.opacity(0.2))
                     .frame(width: 150, height: 150)
                     .cornerRadius(8)
                     .overlay {
                         ProgressView()
+                            .controlSize(.small)
                     }
             }
         }
-        .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
+        .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+        .animation(.easeInOut(duration: 0.2), value: thumbnail != nil)
     }
 }

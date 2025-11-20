@@ -10,8 +10,8 @@ import SwiftUI
 /// Detail view showing a larger version of the selected photo
 struct PhotoDetailView: View {
     let photo: PhotoAsset
-    @Bindable var viewModel: PhotoGridViewModel
-    @State private var fullImage: NSImage?
+    @Bindable var photoService: PhotoGridViewModel
+    @State private var previewImage: NSImage?
     @State private var isLoading = true
     @Environment(\.dismiss) private var dismiss
     
@@ -19,10 +19,28 @@ struct PhotoDetailView: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Text(photo.creationDate?.formatted(date: .long, time: .shortened) ?? "Unknown Date")
-                    .font(.headline)
+                VStack(alignment: .leading, spacing: 4) {
+                    if let creationDate = photo.creationDate {
+                        Text(creationDate.formatted(date: .long, time: .shortened))
+                            .font(.headline)
+                    } else {
+                        Text("Unknown Date")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Text("\(Int(photo.asset.pixelWidth)) × \(Int(photo.asset.pixelHeight))")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
                 
                 Spacer()
+                
+                if isLoading {
+                    ProgressView()
+                        .controlSize(.small)
+                        .padding(.trailing, 8)
+                }
                 
                 Button("Close") {
                     dismiss()
@@ -30,37 +48,52 @@ struct PhotoDetailView: View {
                 .keyboardShortcut(.cancelAction)
             }
             .padding()
-            .background(Color(nsColor: .windowBackgroundColor))
+            .background(.ultraThinMaterial)
             
             // Image content
-            GeometryReader { geometry in
-                if isLoading {
-                    ProgressView("Loading image...")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let fullImage = fullImage {
-                    Image(nsImage: fullImage)
+            ZStack {
+                Color.black
+                
+                if let previewImage = previewImage {
+                    Image(nsImage: previewImage)
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
+                        .transition(.opacity)
+                } else if !isLoading {
                     ContentUnavailableView(
                         "Failed to Load",
                         systemImage: "exclamationmark.triangle",
-                        description: Text("Could not load the full-size image")
+                        description: Text("Could not load the image")
                     )
                 }
             }
-            .background(Color.black)
         }
-        .frame(minWidth: 600, minHeight: 400)
+        .frame(minWidth: 800, minHeight: 600)
         .task {
-            // Load full-size image
-            // For now, using the thumbnail as a placeholder
-            fullImage = viewModel.thumbnail(for: photo)
-            isLoading = false
-            
-            // TODO: Load actual full-size image in the background
-            // This is a placeholder for the MVP
+            await loadImage()
         }
+    }
+    
+    // MARK: - Image Loading
+    
+    private func loadImage() async {
+        // First, show the thumbnail immediately for instant feedback
+        if let thumbnail = photoService.thumbnail(for: photo) {
+            previewImage = thumbnail
+        }
+        
+        isLoading = true
+        
+        // Then load a higher quality preview image
+        // Note: Using preview size instead of full size for better performance
+        // Full size loading can be added later as an enhancement
+        if let preview = await photoService.photoService.image(for: photo, size: ImageSize.preview) {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                previewImage = preview
+            }
+        }
+        
+        isLoading = false
     }
 }

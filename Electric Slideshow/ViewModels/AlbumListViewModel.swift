@@ -14,7 +14,7 @@ import Observation
 class AlbumListViewModel {
     var albums: [Album] = []
     var isLoading = false
-    var errorMessage: String?
+    var error: PhotoLibraryError?
     
     private let photoService: PhotoLibraryService
     
@@ -25,24 +25,32 @@ class AlbumListViewModel {
     /// Load all albums from the photo library
     func loadAlbums() async {
         isLoading = true
-        errorMessage = nil
+        error = nil
         
         do {
-            albums = await photoService.fetchAlbums()
+            albums = try await photoService.fetchAlbums()
+            isLoading = false
+        } catch let photoError as PhotoLibraryError {
+            error = photoError
             isLoading = false
         } catch {
-            errorMessage = "Failed to load albums: \(error.localizedDescription)"
+            error = .fetchFailed
             isLoading = false
         }
     }
     
-    /// Request photo library authorization
+    /// Request photo library authorization and load albums if granted
     func requestAuthorization() async {
         let granted = await photoService.requestAuthorization()
         if granted {
             await loadAlbums()
         } else {
-            errorMessage = "Photo library access denied. Please grant permission in System Settings."
+            error = .notAuthorized
         }
+    }
+    
+    /// Computed property for error message display
+    var errorMessage: String? {
+        error?.errorDescription
     }
 }

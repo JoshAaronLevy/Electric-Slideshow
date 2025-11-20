@@ -10,27 +10,40 @@ import Photos
 import AppKit
 
 /// Service responsible for all PhotoKit interactions
-@MainActor
+/// Uses PHCachingImageManager for optimized thumbnail loading
 class PhotoLibraryService: ObservableObject {
     @Published var authorizationStatus: PHAuthorizationStatus = .notDetermined
     
-    private let imageManager = PHImageManager.default()
+    private let cachingImageManager = PHCachingImageManager()
     
     init() {
         self.authorizationStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        configureCachingManager()
     }
     
+    // MARK: - Configuration
+    
+    private func configureCachingManager() {
+        // Allow a reasonable cache size for smooth scrolling
+        cachingImageManager.allowsCachingHighQualityImages = false
+    }
+    
+    // MARK: - Authorization
+    
     /// Request permission to access the photo library
+    @MainActor
     func requestAuthorization() async -> Bool {
         let status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
         authorizationStatus = status
         return status == .authorized || status == .limited
     }
     
+    // MARK: - Fetching Albums & Assets
+    
     /// Fetch all albums (smart albums + user albums)
-    func fetchAlbums() async -> [Album] {
+    func fetchAlbums() async throws -> [Album] {
         guard authorizationStatus == .authorized || authorizationStatus == .limited else {
-            return []
+            throw PhotoLibraryError.notAuthorized
         }
         
         return await withCheckedContinuation { continuation in
@@ -66,8 +79,12 @@ class PhotoLibraryService: ObservableObject {
         }
     }
     
-    /// Fetch photos from a specific album
-    func fetchPhotos(from album: Album) async -> [PhotoAsset] {
+    /// Fetch assets from a specific album
+    func fetchAssets(in album: Album) async throws -> [PhotoAsset] {
+        guard authorizationStatus == .authorized || authorizationStatus == .limited else {
+            throw PhotoLibraryError.notAuthorized
+        }
+        
         return await withCheckedContinuation { continuation in
             let fetchOptions = PHFetchOptions()
             fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
@@ -85,15 +102,19 @@ class PhotoLibraryService: ObservableObject {
         }
     }
     
+    // MARK: - Image Loading
+    
     /// Load thumbnail image for a photo asset
-    func loadThumbnail(for photoAsset: PhotoAsset, size: CGSize) async -> NSImage? {
+    /// This method can be called concurrently for multiple assets
+    func thumbnail(for photoAsset: PhotoAsset, size: CGSize) async -> NSImage? {
         return await withCheckedContinuation { continuation in
             let options = PHImageRequestOptions()
             options.deliveryMode = .opportunistic
             options.resizeMode = .fast
             options.isNetworkAccessAllowed = true
+            options.isSynchronous = false
             
-            imageManager.requestImage(
+            cachingImageManager.requestImage(
                 for: photoAsset.asset,
                 targetSize: size,
                 contentMode: .aspectFill,
@@ -109,16 +130,20 @@ class PhotoLibraryService: ObservableObject {
         }
     }
     
-    /// Load full-size image for a photo asset (placeholder implementation)
-    func loadFullImage(for photoAsset: PhotoAsset) async -> NSImage? {
+    /// Load full-size or preview image for a photo asset
+    func image(for photoAsset: PhotoAsset, size: CGSize) async -> NSImage? {
         return await withCheckedContinuation { continuation in
             let options = PHImageRequestOptions()
             options.deliveryMode = .highQualityFormat
+            options.resizeMode = .exact
             options.isNetworkAccessAllowed = true
+            options.isSynchronous = false
             
-            imageManager.requestImage(
+            let targetSize = size == ImageSize.fullSize ? PHImageManagerMaximumSize : size
+            
+            cachingImageManager.requestImage(
                 for: photoAsset.asset,
-                targetSize: PHImageManagerMaximumSize,
+                targetSize: targetSize,
                 contentMode: .aspectFit,
                 options: options
             ) { image, _ in
@@ -130,5 +155,39 @@ class PhotoLibraryService: ObservableObject {
                 }
             }
         }
+    }
+    
+    // MARK: - Caching Management
+    
+    /// Start caching images for the given assets
+    /// This preheats the cache for smooth scrolling
+    func startCaching(for assets: [PhotoAsset], size: CGSize) {
+        let phAssets = assets.map { $0.asset }
+        let options = PHImageRequestOptions()
+        options.deliveryMode = .opportunistic
+        options.resizeMode = .fast
+        
+        cachingImageManager.startCachingImages(
+            for: phAssets,
+            targetSize: size,
+            contentMode: .aspectFill,
+            options: options
+        )
+    }
+    
+    /// Stop caching images for the given assets
+    func stopCaching(for assets: [PhotoAsset], size: CGSize) {
+        let phAssets = assets.map { $0.asset }
+        cachingImageManager.stopCachingImages(
+            for: phAssets,
+            targetSize: size,
+            contentMode: .aspectFill,
+            options: nil
+        )
+    }
+    
+    /// Stop all caching
+    func stopCachingAllImages() {
+        cachingImageManager.stopCachingImagesForAllAssets()
     }
 }
