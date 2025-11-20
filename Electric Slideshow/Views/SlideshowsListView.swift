@@ -10,6 +10,7 @@ import SwiftUI
 /// Main landing page listing slideshows
 struct SlideshowsListView: View {
     @StateObject private var viewModel = SlideshowsListViewModel()
+    @State private var showingNewSlideshowFlow = false
     
     var body: some View {
         NavigationStack {
@@ -24,11 +25,15 @@ struct SlideshowsListView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
-                        // TODO: Will be wired in Stage 3
-                        print("New Slideshow tapped")
+                        showingNewSlideshowFlow = true
                     } label: {
                         Label("New Slideshow", systemImage: "plus")
                     }
+                }
+            }
+            .sheet(isPresented: $showingNewSlideshowFlow) {
+                NewSlideshowFlowView { slideshow in
+                    viewModel.addSlideshow(slideshow)
                 }
             }
         }
@@ -43,8 +48,7 @@ struct SlideshowsListView: View {
             Text("Create your first slideshow to get started")
         } actions: {
             Button {
-                // TODO: Will be wired in Stage 3
-                print("Create First Slideshow tapped")
+                showingNewSlideshowFlow = true
             } label: {
                 Text("Create Slideshow")
             }
