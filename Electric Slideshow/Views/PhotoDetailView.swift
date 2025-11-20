@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+internal import Photos
 
 /// Detail view showing a larger version of the selected photo
 struct PhotoDetailView: View {

@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Combine
 
 /// Manages temporary state for creating a new slideshow
 @MainActor

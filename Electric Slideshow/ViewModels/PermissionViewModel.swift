@@ -6,7 +6,8 @@
 //
 
 import Foundation
-import Photos
+internal import Photos
+import Combine
 
 /// Simplified permission state for UI consumption
 enum PermissionState {

@@ -129,30 +129,6 @@ private struct SlideshowRow: View {
     }
 }
 
-#Preview("Empty") {
+#Preview {
     SlideshowsListView()
-}
-
-#Preview("With Slideshows") {
-    let view = SlideshowsListView()
-    view.viewModel.slideshows = [
-        Slideshow(
-            title: "Summer Vacation",
-            photos: [
-                SlideshowPhoto(localIdentifier: "1"),
-                SlideshowPhoto(localIdentifier: "2"),
-                SlideshowPhoto(localIdentifier: "3")
-            ],
-            createdAt: Date().addingTimeInterval(-86400 * 7)
-        ),
-        Slideshow(
-            title: "Family Photos",
-            photos: [
-                SlideshowPhoto(localIdentifier: "4"),
-                SlideshowPhoto(localIdentifier: "5")
-            ],
-            createdAt: Date().addingTimeInterval(-86400 * 2)
-        )
-    ]
-    return view
 }

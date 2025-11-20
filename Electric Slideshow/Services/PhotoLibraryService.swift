@@ -6,12 +6,14 @@
 //
 
 import Foundation
-import Photos
+internal import Photos
 import AppKit
+import Combine
 
 /// Service responsible for all PhotoKit interactions
 /// Uses PHCachingImageManager for optimized thumbnail loading
-class PhotoLibraryService: ObservableObject {
+/// @MainActor
+final class PhotoLibraryService: ObservableObject {
     @Published var authorizationStatus: PHAuthorizationStatus = .notDetermined
     
     private let cachingImageManager = PHCachingImageManager()
@@ -125,9 +127,9 @@ class PhotoLibraryService: ObservableObject {
                 contentMode: .aspectFill,
                 options: options
             ) { image, _ in
-                if let cgImage = image {
-                    let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
-                    continuation.resume(returning: nsImage)
+                // `image` is already an NSImage? on macOS
+                if let image = image {
+                    continuation.resume(returning: image)
                 } else {
                     continuation.resume(returning: nil)
                 }
@@ -152,9 +154,8 @@ class PhotoLibraryService: ObservableObject {
                 contentMode: .aspectFit,
                 options: options
             ) { image, _ in
-                if let cgImage = image {
-                    let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
-                    continuation.resume(returning: nsImage)
+                if let image = image {
+                    continuation.resume(returning: image)
                 } else {
                     continuation.resume(returning: nil)
                 }

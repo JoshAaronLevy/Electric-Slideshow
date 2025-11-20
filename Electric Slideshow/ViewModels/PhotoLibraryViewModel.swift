@@ -6,7 +6,8 @@
 //
 
 import Foundation
-import Photos
+internal import Photos
+import Combine
 
 /// Manages photo library browsing and selection for slideshow creation
 @MainActor
