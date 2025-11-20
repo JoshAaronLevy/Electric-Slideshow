@@ -10,18 +10,26 @@ import SwiftUI
 /// Multi-step flow for creating a new slideshow
 struct NewSlideshowFlowView: View {
     @StateObject private var viewModel = NewSlideshowViewModel()
+    @StateObject private var photoLibraryVM: PhotoLibraryViewModel
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var photoService: PhotoLibraryService
     
     @State private var currentStep: FlowStep = .photoSelection
     
     let onSave: (Slideshow) -> Void
+    
+    init(photoService: PhotoLibraryService, onSave: @escaping (Slideshow) -> Void) {
+        self.onSave = onSave
+        self._photoLibraryVM = StateObject(wrappedValue: PhotoLibraryViewModel(photoService: photoService))
+    }
     
     var body: some View {
         NavigationStack {
             Group {
                 switch currentStep {
                 case .photoSelection:
-                    photoSelectionPlaceholder
+                    PhotoSelectionView(viewModel: photoLibraryVM)
+                        .environmentObject(photoService)
                 case .settings:
                     settingsView
                 }
@@ -40,33 +48,6 @@ struct NewSlideshowFlowView: View {
             }
         }
         .frame(minWidth: 800, minHeight: 600)
-    }
-    
-    // MARK: - Photo Selection Step (Placeholder)
-    
-    private var photoSelectionPlaceholder: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "photo.on.rectangle.angled")
-                .font(.system(size: 64))
-                .foregroundStyle(.secondary)
-            
-            Text("Photo Selection")
-                .font(.title)
-                .fontWeight(.semibold)
-            
-            Text("Photo selection UI will be implemented in Stage 4")
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-            
-            // Temporary: Add some mock photo IDs so we can test the flow
-            Button("Add Mock Photos (for testing)") {
-                viewModel.selectedPhotoIds = ["mock-1", "mock-2", "mock-3"]
-            }
-            .buttonStyle(.bordered)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
     }
     
     // MARK: - Settings Step
@@ -148,9 +129,11 @@ struct NewSlideshowFlowView: View {
         switch currentStep {
         case .photoSelection:
             Button("Next") {
+                // Sync selected photo IDs to the slideshow view model
+                viewModel.selectedPhotoIds = Array(photoLibraryVM.selectedAssetIds)
                 currentStep = .settings
             }
-            .disabled(viewModel.selectedPhotoIds.isEmpty)
+            .disabled(photoLibraryVM.selectedCount == 0)
             
         case .settings:
             Button("Save") {
@@ -193,7 +176,9 @@ extension NewSlideshowFlowView {
 // MARK: - Preview
 
 #Preview {
-    NewSlideshowFlowView { slideshow in
+    let photoService = PhotoLibraryService()
+    return NewSlideshowFlowView(photoService: photoService) { slideshow in
         print("Saved slideshow: \(slideshow.title)")
     }
+    .environmentObject(photoService)
 }

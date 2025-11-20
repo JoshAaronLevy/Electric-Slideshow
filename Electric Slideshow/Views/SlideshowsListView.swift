@@ -10,6 +10,7 @@ import SwiftUI
 /// Main landing page listing slideshows
 struct SlideshowsListView: View {
     @StateObject private var viewModel = SlideshowsListViewModel()
+    @EnvironmentObject private var photoService: PhotoLibraryService
     @State private var showingNewSlideshowFlow = false
     
     var body: some View {
@@ -32,9 +33,10 @@ struct SlideshowsListView: View {
                 }
             }
             .sheet(isPresented: $showingNewSlideshowFlow) {
-                NewSlideshowFlowView { slideshow in
+                NewSlideshowFlowView(photoService: photoService) { slideshow in
                     viewModel.addSlideshow(slideshow)
                 }
+                .environmentObject(photoService)
             }
         }
     }
