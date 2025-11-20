@@ -9,9 +9,16 @@ import SwiftUI
 
 @main
 struct Electric_SlideshowApp: App {
+    @StateObject private var photoService = PhotoLibraryService()
+    
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(photoService)
+        }
+        .windowStyle(.automatic)
+        .commands {
+            CommandGroup(replacing: .newItem) { }
         }
     }
 }
