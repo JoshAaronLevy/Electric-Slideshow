@@ -13,7 +13,7 @@ struct Electric_SlideshowApp: App {
     
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            AppShellView(photoService: photoService)
                 .environmentObject(photoService)
         }
         .windowStyle(.automatic)

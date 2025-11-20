@@ -30,6 +30,11 @@ class PhotoLibraryService: ObservableObject {
     
     // MARK: - Authorization
     
+    /// Get the current authorization status
+    func currentAuthorizationStatus() -> PHAuthorizationStatus {
+        return authorizationStatus
+    }
+    
     /// Request permission to access the photo library
     @MainActor
     func requestAuthorization() async -> Bool {
