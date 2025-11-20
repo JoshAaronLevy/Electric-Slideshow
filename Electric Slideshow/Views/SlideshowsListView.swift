@@ -30,6 +30,7 @@ struct SlideshowsListView: View {
                     } label: {
                         Label("New Slideshow", systemImage: "plus")
                     }
+                    .keyboardShortcut("n", modifiers: .command)
                 }
             }
             .sheet(isPresented: $showingNewSlideshowFlow) {
@@ -77,24 +78,54 @@ struct SlideshowsListView: View {
 
 private struct SlideshowRow: View {
     let slideshow: Slideshow
+    @State private var isHovered = false
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(slideshow.title)
-                .font(.headline)
+        HStack(spacing: 12) {
+            Image(systemName: "photo.stack.fill")
+                .font(.title2)
+                .foregroundStyle(.blue.gradient)
+                .frame(width: 40, height: 40)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.blue.opacity(0.1))
+                )
             
-            HStack(spacing: 16) {
-                Label("\(slideshow.photoCount) photo\(slideshow.photoCount == 1 ? "" : "s")", 
-                      systemImage: "photo")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(slideshow.title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
                 
-                Text(slideshow.createdAt, style: .date)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 12) {
+                    Label("\(slideshow.photoCount)", systemImage: "photo")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    
+                    Text("•")
+                        .foregroundStyle(.tertiary)
+                    
+                    Text(slideshow.createdAt, style: .date)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            
+            Spacer()
+            
+            if isHovered {
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .transition(.scale.combined(with: .opacity))
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 8)
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovered = hovering
+            }
+        }
     }
 }
 

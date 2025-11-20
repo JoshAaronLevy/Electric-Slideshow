@@ -115,18 +115,28 @@ struct PhotoSelectionView: View {
     private var gridHeader: some View {
         HStack {
             if let album = viewModel.selectedAlbum {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(album.title)
-                        .font(.headline)
+                HStack(spacing: 10) {
+                    Image(systemName: "photo.stack")
+                        .foregroundStyle(.blue)
                     
-                    Text("\(viewModel.selectedCount) of \(viewModel.assets.count) selected")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(album.title)
+                            .font(.headline)
+                        
+                        Text("\(viewModel.selectedCount) of \(viewModel.assets.count) selected")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
                 }
             } else {
-                Text("Select an album")
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 10) {
+                    Image(systemName: "photo.on.rectangle.angled")
+                        .foregroundStyle(.secondary)
+                    Text("Select an album")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                }
             }
             
             Spacer()
@@ -138,6 +148,7 @@ struct PhotoSelectionView: View {
                     }
                     .buttonStyle(.bordered)
                     .disabled(viewModel.selectedCount == viewModel.assets.count)
+                    .keyboardShortcut("a", modifiers: .command)
                     
                     Button("Clear") {
                         viewModel.clearSelection()
@@ -153,11 +164,25 @@ struct PhotoSelectionView: View {
     }
     
     private var emptyGridState: some View {
-        ContentUnavailableView(
-            "No Photos",
-            systemImage: "photo",
-            description: Text(viewModel.selectedAlbum != nil ? "This album is empty" : "Select an album to view photos")
-        )
+        VStack(spacing: 20) {
+            Image(systemName: viewModel.selectedAlbum != nil ? "photo.badge.exclamationmark" : "photo.on.rectangle.angled")
+                .font(.system(size: 56))
+                .foregroundStyle(viewModel.selectedAlbum != nil ? .orange : .blue)
+                .symbolEffect(.pulse.byLayer, options: .repeating)
+            
+            VStack(spacing: 8) {
+                Text(viewModel.selectedAlbum != nil ? "No Photos" : "Select an Album")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                
+                Text(viewModel.selectedAlbum != nil ? "This album doesn't contain any photos" : "Choose an album from the sidebar to browse your photos")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 300)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -168,21 +193,27 @@ private struct AlbumRow: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "photo.on.rectangle")
-                .font(.title3)
-                .foregroundStyle(.secondary)
-                .frame(width: 24)
+            ZStack {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.accentColor.opacity(0.1))
+                    .frame(width: 32, height: 32)
+                
+                Image(systemName: "photo.on.rectangle")
+                    .font(.body)
+                    .foregroundStyle(.blue)
+            }
             
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(album.title)
                     .font(.body)
+                    .lineLimit(1)
                 
                 Text("\(album.assetCount) photo\(album.assetCount == 1 ? "" : "s")")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
     }
 }
 
@@ -195,6 +226,7 @@ private struct PhotoThumbnailView: View {
     
     @State private var thumbnail: NSImage?
     @State private var isLoading = true
+    @State private var isHovered = false
     
     private let thumbnailSize = CGSize(width: 300, height: 300)
     
@@ -208,21 +240,26 @@ private struct PhotoThumbnailView: View {
                         .aspectRatio(contentMode: .fill)
                 } else if isLoading {
                     ProgressView()
+                        .controlSize(.small)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     Image(systemName: "photo")
                         .font(.largeTitle)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.tertiary)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
             .frame(width: 120, height: 120)
-            .background(Color(nsColor: .textBackgroundColor))
+            .background(Color(nsColor: .controlBackgroundColor))
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(isSelected ? Color.accentColor : Color.clear, lineWidth: 3)
+                    .strokeBorder(
+                        isSelected ? Color.accentColor : (isHovered ? Color.secondary.opacity(0.3) : Color.clear),
+                        lineWidth: isSelected ? 3 : 1
+                    )
             )
+            .shadow(color: .black.opacity(isSelected ? 0.2 : 0.1), radius: isSelected ? 4 : 2, y: 1)
             
             // Selection indicator
             if isSelected {
@@ -232,11 +269,24 @@ private struct PhotoThumbnailView: View {
                     .background(
                         Circle()
                             .fill(Color.accentColor)
-                            .frame(width: 24, height: 24)
+                            .frame(width: 28, height: 28)
                     )
-                    .padding(8)
+                    .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
+                    .padding(6)
+            }
+            
+            // Hover overlay
+            if isHovered && !isSelected {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.accentColor.opacity(0.1))
             }
         }
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovered = hovering
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: isSelected)
         .task {
             await loadThumbnail()
         }

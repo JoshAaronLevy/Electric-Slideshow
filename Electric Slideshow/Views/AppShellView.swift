@@ -55,10 +55,11 @@ private struct RequestPermissionView: View {
     @ObservedObject var permissionVM: PermissionViewModel
     
     var body: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 32) {
             Image(systemName: "photo.on.rectangle.angled")
                 .font(.system(size: 72))
-                .foregroundStyle(.blue)
+                .foregroundStyle(.blue.gradient)
+                .symbolEffect(.bounce, options: .speed(0.5))
             
             VStack(spacing: 12) {
                 Text("Photos Access Required")
@@ -72,13 +73,17 @@ private struct RequestPermissionView: View {
                     .frame(maxWidth: 400)
             }
             
-            Button("Grant Access") {
+            Button {
                 Task {
                     await permissionVM.requestAuthorization()
                 }
+            } label: {
+                Label("Grant Access", systemImage: "lock.open")
+                    .font(.body.weight(.medium))
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
+            .keyboardShortcut(.return, modifiers: [])
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -91,7 +96,8 @@ private struct PermissionDeniedView: View {
         VStack(spacing: 24) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 72))
-                .foregroundStyle(.orange)
+                .foregroundStyle(.orange.gradient)
+                .symbolEffect(.pulse.byLayer)
             
             VStack(spacing: 12) {
                 Text("Photos Access Denied")
@@ -105,21 +111,54 @@ private struct PermissionDeniedView: View {
                     .frame(maxWidth: 400)
             }
             
-            VStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 12) {
                 Text("To enable access:")
                     .font(.headline)
                 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("1. Open System Settings")
-                    Text("2. Go to Privacy & Security → Photos")
-                    Text("3. Enable access for Electric Slideshow")
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 10) {
+                        Text("1")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.white)
+                            .frame(width: 20, height: 20)
+                            .background(Circle().fill(Color.blue))
+                        Text("Open System Settings")
+                    }
+                    
+                    HStack(spacing: 10) {
+                        Text("2")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.white)
+                            .frame(width: 20, height: 20)
+                            .background(Circle().fill(Color.blue))
+                        Text("Go to Privacy & Security → Photos")
+                    }
+                    
+                    HStack(spacing: 10) {
+                        Text("3")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.white)
+                            .frame(width: 20, height: 20)
+                            .background(Circle().fill(Color.blue))
+                        Text("Enable access for Electric Slideshow")
+                    }
                 }
                 .font(.body)
                 .foregroundStyle(.secondary)
             }
-            .padding()
-            .background(Color.secondary.opacity(0.1))
-            .cornerRadius(8)
+            .padding(20)
+            .frame(maxWidth: 400)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(nsColor: .controlBackgroundColor))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(Color.secondary.opacity(0.2), lineWidth: 1)
+            )
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

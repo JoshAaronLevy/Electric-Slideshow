@@ -30,16 +30,20 @@ struct NewSlideshowFlowView: View {
                 case .photoSelection:
                     PhotoSelectionView(viewModel: photoLibraryVM)
                         .environmentObject(photoService)
+                        .transition(.asymmetric(insertion: .move(edge: .leading), removal: .move(edge: .leading)))
                 case .settings:
                     settingsView
+                        .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .trailing)))
                 }
             }
+            .animation(.easeInOut(duration: 0.3), value: currentStep)
             .navigationTitle(currentStep.title)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
                         dismiss()
                     }
+                    .keyboardShortcut(.cancelAction)
                 }
                 
                 ToolbarItem(placement: .navigation) {
@@ -49,6 +53,7 @@ struct NewSlideshowFlowView: View {
                         } label: {
                             Label("Back", systemImage: "chevron.left")
                         }
+                        .keyboardShortcut("[", modifiers: [.command])
                     }
                 }
                 
@@ -200,12 +205,14 @@ struct NewSlideshowFlowView: View {
                 currentStep = .settings
             }
             .disabled(photoLibraryVM.selectedCount == 0)
+            .keyboardShortcut(.return, modifiers: .command)
             
         case .settings:
             Button("Save") {
                 saveSlideshow()
             }
             .disabled(!viewModel.canSave)
+            .keyboardShortcut(.return, modifiers: .command)
         }
     }
     
