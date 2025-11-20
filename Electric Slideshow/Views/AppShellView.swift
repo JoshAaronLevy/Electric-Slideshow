@@ -159,6 +159,17 @@ private struct PermissionDeniedView: View {
                 RoundedRectangle(cornerRadius: 12)
                     .strokeBorder(Color.secondary.opacity(0.2), lineWidth: 1)
             )
+            
+            Button {
+                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Photos") {
+                    NSWorkspace.shared.open(url)
+                }
+            } label: {
+                Label("Open System Settings", systemImage: "gear")
+                    .font(.body.weight(.medium))
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

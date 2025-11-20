@@ -12,7 +12,7 @@ import Combine
 
 /// Service responsible for all PhotoKit interactions
 /// Uses PHCachingImageManager for optimized thumbnail loading
-/// @MainActor
+@MainActor
 final class PhotoLibraryService: ObservableObject {
     @Published var authorizationStatus: PHAuthorizationStatus = .notDetermined
     

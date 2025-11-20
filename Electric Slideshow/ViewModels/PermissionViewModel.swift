@@ -26,6 +26,10 @@ class PermissionViewModel: ObservableObject {
     
     init(photoService: PhotoLibraryService) {
         self.photoService = photoService
+        
+        // Debug logging for troubleshooting
+        print("📦 Bundle ID:", Bundle.main.bundleIdentifier ?? "nil")
+        print("📸 Initial Photos auth status:", PHPhotoLibrary.authorizationStatus(for: .readWrite).rawValue)
     }
     
     /// Check current authorization status on startup
