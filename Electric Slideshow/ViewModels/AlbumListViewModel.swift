@@ -34,7 +34,7 @@ class AlbumListViewModel {
             error = photoError
             isLoading = false
         } catch {
-            error = .fetchFailed
+            self.error = .fetchFailed
             isLoading = false
         }
     }

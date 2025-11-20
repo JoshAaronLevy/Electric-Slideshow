@@ -19,8 +19,8 @@ class PhotoGridViewModel {
     var loadingProgress: Double = 0.0
     var error: PhotoLibraryError?
     
-    private let photoService: PhotoLibraryService
-    private var loadingTask: Task<Void, Never>?
+    let photoService: PhotoLibraryService
+    var loadingTask: Task<Void, Never>?
     
     init(photoService: PhotoLibraryService) {
         self.photoService = photoService
@@ -56,7 +56,7 @@ class PhotoGridViewModel {
             error = photoError
             isLoading = false
         } catch {
-            error = .fetchFailed
+            self.error = .fetchFailed
             isLoading = false
         }
     }

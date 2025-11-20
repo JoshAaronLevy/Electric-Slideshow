@@ -99,7 +99,7 @@ struct PhotoGridView: View {
 }
 
 /// Individual thumbnail cell in the grid
-struct PhotoThumbnailView: View {
+private struct PhotoThumbnailView: View {
     let photo: PhotoAsset
     let thumbnail: NSImage?
     

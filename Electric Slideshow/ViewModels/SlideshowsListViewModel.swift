@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Combine
 
 /// Manages the list of slideshows and their persistence
 @MainActor
@@ -37,7 +38,10 @@ class SlideshowsListViewModel: ObservableObject {
     
     /// Delete slideshows at the given offsets
     func deleteSlideshows(at offsets: IndexSet) {
-        slideshows.remove(atOffsets: offsets)
+        // Remove in reverse order so indices stay valid
+        for index in offsets.sorted(by: >) {
+            slideshows.remove(at: index)
+        }
         saveSlideshows()
     }
     
