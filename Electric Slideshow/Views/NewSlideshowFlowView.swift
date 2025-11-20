@@ -42,6 +42,16 @@ struct NewSlideshowFlowView: View {
                     }
                 }
                 
+                ToolbarItem(placement: .navigation) {
+                    if currentStep == .settings {
+                        Button {
+                            currentStep = .photoSelection
+                        } label: {
+                            Label("Back", systemImage: "chevron.left")
+                        }
+                    }
+                }
+                
                 ToolbarItem(placement: .primaryAction) {
                     primaryActionButton
                 }
@@ -54,65 +64,121 @@ struct NewSlideshowFlowView: View {
     
     private var settingsView: some View {
         Form {
+            // Summary section
             Section {
-                TextField("Slideshow Title", text: $viewModel.title, prompt: Text("Enter a title"))
-                    .textFieldStyle(.roundedBorder)
-                
-                if !viewModel.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Label("Title is required", systemImage: "checkmark.circle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.green)
-                } else {
-                    Label("Title is required", systemImage: "exclamationmark.circle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
+                HStack(spacing: 12) {
+                    Image(systemName: "photo.on.rectangle.angled")
+                        .font(.title)
+                        .foregroundStyle(.blue)
+                        .frame(width: 40)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(viewModel.selectedPhotoIds.count) Photos Selected")
+                            .font(.headline)
+                        
+                        Text("Ready to customize your slideshow")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Button {
+                        currentStep = .photoSelection
+                    } label: {
+                        Text("Change Selection")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .padding(.vertical, 4)
+            }
+            
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    TextField("Slideshow Title", text: $viewModel.title, prompt: Text("My Slideshow"))
+                        .textFieldStyle(.roundedBorder)
+                        .font(.body)
+                    
+                    if !viewModel.title.isEmpty {
+                        if !viewModel.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            Label("Title looks good", systemImage: "checkmark.circle.fill")
+                                .font(.caption)
+                                .foregroundStyle(.green)
+                        } else {
+                            Label("Title cannot be only whitespace", systemImage: "exclamationmark.circle.fill")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                        }
+                    }
                 }
             } header: {
                 Text("Basic Information")
+            } footer: {
+                if viewModel.title.isEmpty {
+                    Text("Give your slideshow a memorable name")
+                        .font(.caption)
+                }
             }
             
             Section {
-                HStack {
-                    Text("Duration per slide")
-                    Spacer()
-                    Text("\(viewModel.settings.durationPerSlide, specifier: "%.1f") seconds")
-                        .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Duration per slide")
+                            .font(.body)
+                        Spacer()
+                        Text("\(viewModel.settings.durationPerSlide, specifier: "%.1f")s")
+                            .font(.body)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
+                    
+                    Slider(
+                        value: Binding(
+                            get: { viewModel.settings.durationPerSlide },
+                            set: { viewModel.settings.durationPerSlide = $0 }
+                        ),
+                        in: 1...10,
+                        step: 0.5
+                    )
                 }
-                
-                Slider(
-                    value: Binding(
-                        get: { viewModel.settings.durationPerSlide },
-                        set: { viewModel.settings.durationPerSlide = $0 }
-                    ),
-                    in: 1...10,
-                    step: 0.5
-                )
-                
-                Text("How long each photo will be displayed")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             } header: {
                 Text("Timing")
+            } footer: {
+                Text("How long each photo will be displayed during the slideshow")
+                    .font(.caption)
             }
             
             Section {
-                Toggle("Shuffle photos", isOn: Binding(
-                    get: { viewModel.settings.shuffle },
-                    set: { viewModel.settings.shuffle = $0 }
-                ))
-                
-                Text("Photos will be displayed in random order")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                
-                Toggle("Repeat slideshow", isOn: Binding(
-                    get: { viewModel.settings.repeatEnabled },
-                    set: { viewModel.settings.repeatEnabled = $0 }
-                ))
-                
-                Text("Slideshow will loop continuously")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 12) {
+                    Toggle(isOn: Binding(
+                        get: { viewModel.settings.shuffle },
+                        set: { viewModel.settings.shuffle = $0 }
+                    )) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Shuffle photos")
+                                .font(.body)
+                            Text("Photos will be displayed in random order")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    
+                    Divider()
+                    
+                    Toggle(isOn: Binding(
+                        get: { viewModel.settings.repeatEnabled },
+                        set: { viewModel.settings.repeatEnabled = $0 }
+                    )) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Repeat slideshow")
+                                .font(.body)
+                            Text("Slideshow will loop continuously")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
             } header: {
                 Text("Playback Options")
             }
@@ -151,6 +217,11 @@ struct NewSlideshowFlowView: View {
         }
         
         onSave(slideshow)
+        
+        // Reset view model for next time
+        viewModel.reset()
+        photoLibraryVM.clearSelection()
+        
         dismiss()
     }
 }
