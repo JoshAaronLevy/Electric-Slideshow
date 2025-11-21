@@ -23,8 +23,13 @@ struct AppShellView: View {
                 PermissionNotificationBar(
                     state: permissionVM.state,
                     onRequestAccess: {
+                        print("🔍 AppShellView: Grant Access button tapped")
+                        print("🔍 AppShellView: Current permission state: \(permissionVM.state)")
+                        // Use Task to properly handle async call in non-async context
                         Task {
-                            await permissionVM.requestAuthorization()
+                            print("🔍 AppShellView: Starting permission request")
+                            await permissionVM.requestAuthorizationSync()
+                            print("🔍 AppShellView: Permission request completed")
                         }
                     },
                     onShowInstructions: {

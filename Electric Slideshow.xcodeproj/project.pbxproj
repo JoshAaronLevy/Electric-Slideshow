@@ -276,6 +276,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
+				CODE_SIGN_ENTITLEMENTS = "Electric Slideshow/Electric_Slideshow.entitlements";
 			};
 			name = Debug;
 		};
@@ -310,6 +311,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
+				CODE_SIGN_ENTITLEMENTS = "Electric Slideshow/Electric_Slideshow.entitlements";
 			};
 			name = Release;
 		};

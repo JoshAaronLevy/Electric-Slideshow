@@ -14,7 +14,11 @@ import Combine
 /// Uses PHCachingImageManager for optimized thumbnail loading
 @MainActor
 final class PhotoLibraryService: ObservableObject {
-    @Published var authorizationStatus: PHAuthorizationStatus = .notDetermined
+    @Published var authorizationStatus: PHAuthorizationStatus = .notDetermined {
+        didSet {
+            print("🔍 PhotoLibraryService: authorizationStatus changed from \(oldValue.rawValue) to \(authorizationStatus.rawValue)")
+        }
+    }
     
     private let cachingImageManager = PHCachingImageManager()
     
@@ -40,9 +44,21 @@ final class PhotoLibraryService: ObservableObject {
     /// Request permission to access the photo library
     @MainActor
     func requestAuthorization() async -> Bool {
+        print("🔍 PhotoLibraryService: Starting requestAuthorization()")
+        print("🔍 PhotoLibraryService: Current authorization status before request: \(authorizationStatus.rawValue)")
+        print("🔍 PhotoLibraryService: Bundle ID: \(Bundle.main.bundleIdentifier ?? "nil")")
+        print("🔍 PhotoLibraryService: About to call PHPhotoLibrary.requestAuthorization(for: .readWrite)")
+        
         let status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+        
+        print("🔍 PhotoLibraryService: PHPhotoLibrary.requestAuthorization() completed")
+        print("🔍 PhotoLibraryService: New authorization status: \(status.rawValue)")
+        
         authorizationStatus = status
-        return status == .authorized || status == .limited
+        
+        let result = status == .authorized || status == .limited
+        print("🔍 PhotoLibraryService: requestAuthorization() returning: \(result)")
+        return result
     }
     
     // MARK: - Fetching Albums & Assets
