@@ -131,6 +131,8 @@ final class PhotoLibraryService: ObservableObject {
     /// This method can be called concurrently for multiple assets
     func thumbnail(for photoAsset: PhotoAsset, size: CGSize) async -> NSImage? {
         return await withCheckedContinuation { continuation in
+            var hasResumed = false
+            
             let options = PHImageRequestOptions()
             options.deliveryMode = .opportunistic
             options.resizeMode = .fast
@@ -143,6 +145,12 @@ final class PhotoLibraryService: ObservableObject {
                 contentMode: .aspectFill,
                 options: options
             ) { image, _ in
+                // PHImageManager can call this completion handler multiple times
+                // (first with low-quality, then with high-quality image)
+                // Only resume the continuation on the first call
+                guard !hasResumed else { return }
+                hasResumed = true
+                
                 // `image` is already an NSImage? on macOS
                 if let image = image {
                     continuation.resume(returning: image)
