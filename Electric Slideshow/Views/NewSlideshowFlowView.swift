@@ -9,18 +9,35 @@ import SwiftUI
 
 /// Multi-step flow for creating a new slideshow
 struct NewSlideshowFlowView: View {
-    @StateObject private var viewModel = NewSlideshowViewModel()
+    @StateObject private var viewModel: NewSlideshowViewModel
     @StateObject private var photoLibraryVM: PhotoLibraryViewModel
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var photoService: PhotoLibraryService
+    @EnvironmentObject private var playlistsStore: PlaylistsStore
     
     @State private var currentStep: FlowStep = .photoSelection
+    @State private var musicSelection: MusicSelection = .none
     
     let onSave: (Slideshow) -> Void
     
-    init(photoService: PhotoLibraryService, onSave: @escaping (Slideshow) -> Void) {
+    init(photoService: PhotoLibraryService, editingSlideshow: Slideshow? = nil, onSave: @escaping (Slideshow) -> Void) {
         self.onSave = onSave
+        self._viewModel = StateObject(wrappedValue: NewSlideshowViewModel(editingSlideshow: editingSlideshow))
         self._photoLibraryVM = StateObject(wrappedValue: PhotoLibraryViewModel(photoService: photoService))
+        
+        // Initialize music selection from editing slideshow
+        if let playlistId = editingSlideshow?.settings.linkedPlaylistId {
+            self._musicSelection = State(initialValue: .appPlaylist(playlistId))
+        }
+    }
+    
+    enum MusicSelection: Hashable {
+        case none
+        case appPlaylist(UUID)
+    }
+    
+    private var appPlaylists: [AppPlaylist] {
+        playlistsStore.playlists
     }
     
     var body: some View {
@@ -187,6 +204,41 @@ struct NewSlideshowFlowView: View {
             } header: {
                 Text("Playback Options")
             }
+            
+            Section {
+                Picker("Background Music", selection: $musicSelection) {
+                    Text("No Music")
+                        .tag(MusicSelection.none)
+                    
+                    if !appPlaylists.isEmpty {
+                        Divider()
+                        
+                        ForEach(appPlaylists) { playlist in
+                            HStack {
+                                Image(systemName: "music.note.list")
+                                Text(playlist.name)
+                            }
+                            .tag(MusicSelection.appPlaylist(playlist.id))
+                        }
+                    }
+                }
+                .pickerStyle(.menu)
+            } header: {
+                Text("Music")
+            } footer: {
+                if case .appPlaylist = musicSelection {
+                    HStack(spacing: 4) {
+                        Image(systemName: "music.note")
+                            .font(.caption2)
+                        Text("Music will play during slideshow")
+                            .font(.caption)
+                    }
+                    .foregroundStyle(.secondary)
+                } else if appPlaylists.isEmpty {
+                    Text("Create playlists in the Music section to add background music")
+                        .font(.caption)
+                }
+            }
         }
         .formStyle(.grouped)
         .frame(maxWidth: 600)
@@ -219,6 +271,14 @@ struct NewSlideshowFlowView: View {
     // MARK: - Actions
     
     private func saveSlideshow() {
+        // Update settings with music selection
+        switch musicSelection {
+        case .none:
+            viewModel.settings.linkedPlaylistId = nil
+        case .appPlaylist(let id):
+            viewModel.settings.linkedPlaylistId = id
+        }
+        
         guard let slideshow = viewModel.buildSlideshow() else {
             return
         }
@@ -228,6 +288,7 @@ struct NewSlideshowFlowView: View {
         // Reset view model for next time
         viewModel.reset()
         photoLibraryVM.clearSelection()
+        musicSelection = .none
         
         dismiss()
     }

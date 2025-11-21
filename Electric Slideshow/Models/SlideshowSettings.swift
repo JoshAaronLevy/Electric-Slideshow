@@ -18,10 +18,14 @@ struct SlideshowSettings: Codable, Equatable {
     /// Whether the slideshow should loop continuously
     var repeatEnabled: Bool
     
+    /// Optional linked app playlist for background music
+    var linkedPlaylistId: UUID?
+    
     /// Default settings
     static let `default` = SlideshowSettings(
         durationPerSlide: 3.0,
         shuffle: false,
-        repeatEnabled: true
+        repeatEnabled: true,
+        linkedPlaylistId: nil
     )
 }

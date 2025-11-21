@@ -12,6 +12,15 @@ struct SlideshowsListView: View {
     @StateObject private var viewModel = SlideshowsListViewModel()
     @EnvironmentObject private var photoService: PhotoLibraryService
     @State private var showingNewSlideshowFlow = false
+    @State private var slideshowToEdit: Slideshow?
+    @State private var slideshowToDelete: Slideshow?
+    
+    // 3-column grid layout
+    private let columns = [
+        GridItem(.flexible(), spacing: 20),
+        GridItem(.flexible(), spacing: 20),
+        GridItem(.flexible(), spacing: 20)
+    ]
     
     var body: some View {
         NavigationStack {
@@ -19,7 +28,7 @@ struct SlideshowsListView: View {
                 if viewModel.isEmpty {
                     emptyStateView
                 } else {
-                    slideshowsList
+                    slideshowsGrid
                 }
             }
             .navigationTitle("Slideshows")
@@ -38,6 +47,26 @@ struct SlideshowsListView: View {
                     viewModel.addSlideshow(slideshow)
                 }
                 .environmentObject(photoService)
+            }
+            .sheet(item: $slideshowToEdit) { slideshow in
+                NewSlideshowFlowView(
+                    photoService: photoService,
+                    editingSlideshow: slideshow
+                ) { updatedSlideshow in
+                    viewModel.updateSlideshow(updatedSlideshow)
+                }
+                .environmentObject(photoService)
+            }
+            .alert("Delete Slideshow?", isPresented: .constant(slideshowToDelete != nil), presenting: slideshowToDelete) { slideshow in
+                Button("Cancel", role: .cancel) {
+                    slideshowToDelete = nil
+                }
+                Button("Delete", role: .destructive) {
+                    viewModel.deleteSlideshow(slideshow)
+                    slideshowToDelete = nil
+                }
+            } message: { slideshow in
+                Text("Are you sure you want to delete \"\(slideshow.title)\"? This action cannot be undone.")
             }
         }
     }
@@ -59,72 +88,27 @@ struct SlideshowsListView: View {
         }
     }
     
-    // MARK: - List View
+    // MARK: - Grid View
     
-    private var slideshowsList: some View {
-        List {
-            ForEach(viewModel.slideshows) { slideshow in
-                SlideshowRow(slideshow: slideshow)
-            }
-            .onDelete { indexSet in
-                viewModel.deleteSlideshows(at: indexSet)
-            }
-        }
-        .listStyle(.inset)
-    }
-}
-
-// MARK: - Slideshow Row
-
-private struct SlideshowRow: View {
-    let slideshow: Slideshow
-    @State private var isHovered = false
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "photo.stack.fill")
-                .font(.title2)
-                .foregroundStyle(.blue.gradient)
-                .frame(width: 40, height: 40)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.blue.opacity(0.1))
-                )
-            
-            VStack(alignment: .leading, spacing: 6) {
-                Text(slideshow.title)
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-                
-                HStack(spacing: 12) {
-                    Label("\(slideshow.photoCount)", systemImage: "photo")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    
-                    Text("•")
-                        .foregroundStyle(.tertiary)
-                    
-                    Text(slideshow.createdAt, style: .date)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+    private var slideshowsGrid: some View {
+        ScrollView {
+            LazyVGrid(columns: columns, spacing: 20) {
+                ForEach(viewModel.slideshows) { slideshow in
+                    SlideshowCardView(
+                        slideshow: slideshow,
+                        onPlay: {
+                            // Will implement in Phase 4
+                        },
+                        onEdit: {
+                            slideshowToEdit = slideshow
+                        },
+                        onDelete: {
+                            slideshowToDelete = slideshow
+                        }
+                    )
                 }
             }
-            
-            Spacer()
-            
-            if isHovered {
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .transition(.scale.combined(with: .opacity))
-            }
-        }
-        .padding(.vertical, 8)
-        .contentShape(Rectangle())
-        .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
-                isHovered = hovering
-            }
+            .padding()
         }
     }
 }

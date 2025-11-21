@@ -15,6 +15,18 @@ class NewSlideshowViewModel: ObservableObject {
     @Published var selectedPhotoIds: [String] = []
     @Published var settings: SlideshowSettings = .default
     
+    private let editingSlideshow: Slideshow?
+    
+    init(editingSlideshow: Slideshow? = nil) {
+        self.editingSlideshow = editingSlideshow
+        
+        if let slideshow = editingSlideshow {
+            self.title = slideshow.title
+            self.selectedPhotoIds = slideshow.photos.map { $0.localIdentifier }
+            self.settings = slideshow.settings
+        }
+    }
+    
     /// Whether the slideshow has enough data to be saved
     var canSave: Bool {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
@@ -43,10 +55,20 @@ class NewSlideshowViewModel: ObservableObject {
         
         let photos = selectedPhotoIds.map { SlideshowPhoto(localIdentifier: $0) }
         
-        return Slideshow(
-            title: trimmedTitle,
-            photos: photos,
-            settings: settings
-        )
+        if let existing = editingSlideshow {
+            // Editing existing slideshow
+            var updated = existing
+            updated.title = trimmedTitle
+            updated.photos = photos
+            updated.settings = settings
+            return updated
+        } else {
+            // Creating new slideshow
+            return Slideshow(
+                title: trimmedTitle,
+                photos: photos,
+                settings: settings
+            )
+        }
     }
 }

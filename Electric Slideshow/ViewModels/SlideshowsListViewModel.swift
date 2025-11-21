@@ -51,6 +51,14 @@ class SlideshowsListViewModel: ObservableObject {
         saveSlideshows()
     }
     
+    /// Update an existing slideshow
+    func updateSlideshow(_ slideshow: Slideshow) {
+        if let index = slideshows.firstIndex(where: { $0.id == slideshow.id }) {
+            slideshows[index] = slideshow
+            saveSlideshows()
+        }
+    }
+    
     /// Save all slideshows to persistent storage
     private func saveSlideshows() {
         store.saveSlideshows(slideshows)
