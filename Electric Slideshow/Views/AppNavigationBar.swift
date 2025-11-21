@@ -71,15 +71,18 @@ struct AppNavigationBar: View {
     }
     
     private func navigationButton(for section: AppSection) -> some View {
-        Button {
+        let isSelected = selectedSection == section
+        
+        return Button {
             onSectionSelected(section)
         } label: {
             Image(systemName: section.systemImageName)
                 .font(.system(size: 18))
-                .foregroundStyle(selectedSection == section ? .primary : .secondary)
+                .fontWeight(isSelected ? .semibold : .regular)
+                .foregroundStyle(isSelected ? .accentColor : .secondary)
                 .frame(width: 32, height: 32)
                 .background(
-                    selectedSection == section
+                    isSelected
                         ? Color.accentColor.opacity(0.15)
                         : Color.clear
                 )

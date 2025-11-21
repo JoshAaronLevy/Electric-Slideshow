@@ -45,9 +45,15 @@ struct AppMainView: View {
     // MARK: - Navigation Handling
     
     private func handleSectionSelection(_ section: AppSection) {
-        // For now, all sections can be selected
-        // User icon behavior can be customized later if needed
-        selectedSection = section
+        switch section {
+        case .user:
+            // TODO: Will trigger a user profile modal in the future
+            // For now, do nothing - user icon doesn't change sections
+            break
+        default:
+            // Switch to the selected section
+            selectedSection = section
+        }
     }
 }
 
