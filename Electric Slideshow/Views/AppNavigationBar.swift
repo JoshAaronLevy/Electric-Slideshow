@@ -20,24 +20,28 @@ struct AppNavigationBar: View {
         HStack(spacing: 0) {
             // Left: Stacked app name
             appTitleView
-                .frame(minWidth: 120)
+                .frame(minWidth: 100, alignment: .leading)
             
-            Spacer()
+            Spacer(minLength: 20)
             
             // Center: Current section title
             Text(currentSectionTitle)
-                .font(.headline)
+                .font(.title3)
+                .fontWeight(.medium)
                 .foregroundStyle(.primary)
+                .lineLimit(1)
+                .frame(maxWidth: 300)
             
-            Spacer()
+            Spacer(minLength: 20)
             
             // Right: Navigation icons
             navigationIcons
-                .frame(minWidth: 120)
+                .frame(minWidth: 100, alignment: .trailing)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
         .frame(height: 56)
+        .frame(minWidth: 600)
         .background(Color(nsColor: .windowBackgroundColor))
         .overlay(
             Divider(),
@@ -48,22 +52,22 @@ struct AppNavigationBar: View {
     // MARK: - App Title
     
     private var appTitleView: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 1) {
             Text(appTitleTop)
-                .font(.headline)
-                .fontWeight(.semibold)
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(.primary)
             
             Text(appTitleBottom)
-                .font(.caption)
+                .font(.system(size: 11))
                 .foregroundStyle(.secondary)
         }
+        .frame(height: 32)
     }
     
     // MARK: - Navigation Icons
     
     private var navigationIcons: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             ForEach(sections) { section in
                 navigationButton(for: section)
             }
@@ -77,55 +81,94 @@ struct AppNavigationBar: View {
             onSectionSelected(section)
         } label: {
             Image(systemName: section.systemImageName)
-                .font(.system(size: 18))
+                .font(.system(size: 17))
                 .fontWeight(isSelected ? .semibold : .regular)
                 .foregroundStyle(isSelected ? .accentColor : .secondary)
-                .frame(width: 32, height: 32)
+                .frame(width: 34, height: 34)
                 .background(
-                    isSelected
-                        ? Color.accentColor.opacity(0.15)
-                        : Color.clear
+                    RoundedRectangle(cornerRadius: 7)
+                        .fill(isSelected ? Color.accentColor.opacity(0.15) : Color.clear)
                 )
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help(section.title)
+        .animation(.easeInOut(duration: 0.15), value: isSelected)
     }
 }
 
 #Preview("Slideshows Selected") {
-    AppNavigationBar(
-        appTitleTop: "Electric",
-        appTitleBottom: "Slideshow",
-        currentSectionTitle: "Slideshows",
-        sections: [.slideshows, .music, .settings, .user],
-        selectedSection: .slideshows,
-        onSectionSelected: { _ in }
-    )
-    .frame(width: 800)
+    VStack(spacing: 0) {
+        AppNavigationBar(
+            appTitleTop: "Electric",
+            appTitleBottom: "Slideshow",
+            currentSectionTitle: "Slideshows",
+            sections: [.slideshows, .music, .settings, .user],
+            selectedSection: .slideshows,
+            onSectionSelected: { _ in }
+        )
+        Spacer()
+    }
+    .frame(width: 800, height: 600)
 }
 
 #Preview("Music Selected") {
-    AppNavigationBar(
-        appTitleTop: "Electric",
-        appTitleBottom: "Slideshow",
-        currentSectionTitle: "Music",
-        sections: [.slideshows, .music, .settings, .user],
-        selectedSection: .music,
-        onSectionSelected: { _ in }
-    )
-    .frame(width: 800)
+    VStack(spacing: 0) {
+        AppNavigationBar(
+            appTitleTop: "Electric",
+            appTitleBottom: "Slideshow",
+            currentSectionTitle: "Music",
+            sections: [.slideshows, .music, .settings, .user],
+            selectedSection: .music,
+            onSectionSelected: { _ in }
+        )
+        Spacer()
+    }
+    .frame(width: 800, height: 600)
 }
 
 #Preview("Dark Mode") {
-    AppNavigationBar(
-        appTitleTop: "Electric",
-        appTitleBottom: "Slideshow",
-        currentSectionTitle: "Settings",
-        sections: [.slideshows, .music, .settings, .user],
-        selectedSection: .settings,
-        onSectionSelected: { _ in }
-    )
-    .frame(width: 800)
+    VStack(spacing: 0) {
+        AppNavigationBar(
+            appTitleTop: "Electric",
+            appTitleBottom: "Slideshow",
+            currentSectionTitle: "Settings",
+            sections: [.slideshows, .music, .settings, .user],
+            selectedSection: .settings,
+            onSectionSelected: { _ in }
+        )
+        Spacer()
+    }
+    .frame(width: 800, height: 600)
     .preferredColorScheme(.dark)
+}
+
+#Preview("Narrow Window") {
+    VStack(spacing: 0) {
+        AppNavigationBar(
+            appTitleTop: "Electric",
+            appTitleBottom: "Slideshow",
+            currentSectionTitle: "Slideshows",
+            sections: [.slideshows, .music, .settings, .user],
+            selectedSection: .slideshows,
+            onSectionSelected: { _ in }
+        )
+        Spacer()
+    }
+    .frame(width: 600, height: 400)
+}
+
+#Preview("Wide Window") {
+    VStack(spacing: 0) {
+        AppNavigationBar(
+            appTitleTop: "Electric",
+            appTitleBottom: "Slideshow",
+            currentSectionTitle: "Music",
+            sections: [.slideshows, .music, .settings, .user],
+            selectedSection: .music,
+            onSectionSelected: { _ in }
+        )
+        Spacer()
+    }
+    .frame(width: 1200, height: 800)
 }
