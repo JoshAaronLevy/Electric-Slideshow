@@ -1,74 +1,135 @@
 import SwiftUI
 
-/// View for displaying Spotify connection status and authentication controls
+/// View for displaying Spotify connection and managing app playlists
 struct MusicView: View {
-    @StateObject private var viewModel = MusicViewModel()
     @EnvironmentObject private var spotifyAuthService: SpotifyAuthService
+    @EnvironmentObject private var playlistsStore: PlaylistsStore
+    @StateObject private var apiService: SpotifyAPIService
+    @State private var showingNewPlaylistFlow = false
+    
+    init() {
+        self._apiService = StateObject(wrappedValue: SpotifyAPIService(authService: SpotifyAuthService.shared))
+    }
     
     var body: some View {
-        VStack(spacing: 16) {
-            // Connection Status
-            HStack {
-                Image(systemName: viewModel.isConnected ? "checkmark.circle.fill" : "xmark.circle.fill")
-                    .foregroundColor(viewModel.isConnected ? .green : .red)
-                    .font(.title2)
-                
-                Text(viewModel.statusMessage)
-                    .font(.headline)
-                
-                Spacer()
+        Group {
+            if spotifyAuthService.isAuthenticated {
+                playlistsView
+            } else {
+                notConnectedView
             }
-            .padding()
-            .background(Color.secondary.opacity(0.1))
-            .cornerRadius(8)
+        }
+    }
+    
+    private var playlistsView: some View {
+        NavigationStack {
+            List {
+                Section("App Playlists") {
+                    if playlistsStore.playlists.isEmpty {
+                        ContentUnavailableView(
+                            "No Playlists Yet",
+                            systemImage: "music.note.list",
+                            description: Text("Create a playlist from your Spotify library to add music to your slideshows")
+                        )
+                    } else {
+                        ForEach(playlistsStore.playlists) { playlist in
+                            PlaylistRow(playlist: playlist)
+                        }
+                        .onDelete { offsets in
+                            playlistsStore.deletePlaylist(at: offsets)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Music")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showingNewPlaylistFlow = true
+                    } label: {
+                        Label("New Playlist", systemImage: "plus")
+                    }
+                }
+                
+                ToolbarItem(placement: .status) {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                        Text("Connected to Spotify")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .sheet(isPresented: $showingNewPlaylistFlow) {
+                NewPlaylistFlowView(
+                    spotifyAPIService: apiService,
+                    playlistsStore: playlistsStore
+                ) { playlist in
+                    playlistsStore.addPlaylist(playlist)
+                }
+            }
+        }
+    }
+    
+    private var notConnectedView: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "music.note")
+                .font(.system(size: 60))
+                .foregroundStyle(.secondary)
             
-            // Error Message
+            Text("Connect Spotify")
+                .font(.title)
+            
+            Text("Connect your Spotify account to create playlists for your slideshows")
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal)
+            
+            Button("Connect with Spotify") {
+                spotifyAuthService.beginAuthentication()
+            }
+            .buttonStyle(.borderedProminent)
+            
             if let error = spotifyAuthService.authError {
                 HStack {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundColor(.orange)
                     
                     Text(error)
-                        .font(.subheadline)
+                        .font(.caption)
                         .foregroundColor(.secondary)
-                    
-                    Spacer()
                 }
                 .padding()
                 .background(Color.orange.opacity(0.1))
                 .cornerRadius(8)
             }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+struct PlaylistRow: View {
+    let playlist: AppPlaylist
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "music.note.list")
+                .font(.title2)
+                .foregroundStyle(.blue)
             
-            // Connect/Disconnect Button
-            Button(action: {
-                if viewModel.isConnected {
-                    viewModel.disconnectFromSpotify()
-                } else {
-                    viewModel.connectToSpotify()
-                }
-            }) {
-                HStack {
-                    if viewModel.isConnecting {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Image(systemName: viewModel.isConnected ? "arrow.right.square" : "music.note")
-                    }
-                    
-                    Text(viewModel.isConnected ? "Disconnect from Spotify" : "Connect to Spotify")
-                }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(viewModel.isConnected ? Color.red : Color.green)
-                .foregroundColor(.white)
-                .cornerRadius(8)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(playlist.name)
+                    .font(.headline)
+                Text("\(playlist.trackCount) songs")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            .disabled(viewModel.isConnecting)
             
             Spacer()
         }
-        .padding()
-        .navigationTitle("Music")
+        .padding(.vertical, 4)
     }
 }
 
@@ -76,5 +137,6 @@ struct MusicView: View {
     NavigationStack {
         MusicView()
             .environmentObject(SpotifyAuthService.shared)
+            .environmentObject(PlaylistsStore())
     }
 }

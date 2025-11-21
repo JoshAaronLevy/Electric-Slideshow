@@ -11,12 +11,14 @@ import SwiftUI
 struct Electric_SlideshowApp: App {
     @StateObject private var photoService = PhotoLibraryService()
     @StateObject private var spotifyAuthService = SpotifyAuthService.shared
+    @StateObject private var playlistsStore = PlaylistsStore()
     
     var body: some Scene {
         WindowGroup {
             AppShellView(photoService: photoService)
                 .environmentObject(photoService)
                 .environmentObject(spotifyAuthService)
+                .environmentObject(playlistsStore)
                 .onOpenURL { url in
                     // Handle OAuth callback
                     if url.scheme == "com.slideshowbuddy" {
