@@ -1,11 +1,11 @@
 import Foundation
 import Combine
-internal import SwiftUI
+import AppKit
 
 /// Service for managing Spotify OAuth authentication flow
 @MainActor
 final class SpotifyAuthService: ObservableObject {
-    var objectWillChange: ObservableObjectPublisher
+    var objectWillChange = ObservableObjectPublisher()
     
     static let shared = SpotifyAuthService()
     
@@ -16,6 +16,8 @@ final class SpotifyAuthService: ObservableObject {
     private let keychainKey = "spotifyAuthToken"
     
     private init() {
+        // All properties are now initialized with default values
+        // Safe to call method that accesses properties
         checkAuthenticationStatus()
     }
     
@@ -31,7 +33,7 @@ final class SpotifyAuthService: ObservableObject {
         self.codeVerifier = verifier
         
         // Build authorization URL
-        var components = URLComponents(string: SpotifyConfig.spotifyAuthURL)!
+        var components = URLComponents(string: SpotifyConfig.spotifyAuthURL.absoluteString)!
         components.queryItems = [
             URLQueryItem(name: "client_id", value: SpotifyConfig.clientId),
             URLQueryItem(name: "response_type", value: "code"),
@@ -109,9 +111,7 @@ final class SpotifyAuthService: ObservableObject {
     }
     
     private func exchangeCodeForToken(code: String, codeVerifier: String) async throws {
-        guard let url = URL(string: SpotifyConfig.tokenExchangeURL) else {
-            throw SpotifyAuthError.invalidURL
-        }
+        let url = SpotifyConfig.tokenExchangeURL
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -139,9 +139,7 @@ final class SpotifyAuthService: ObservableObject {
     }
     
     private func refreshAccessToken(refreshToken: String) async throws -> String {
-        guard let url = URL(string: SpotifyConfig.tokenRefreshURL) else {
-            throw SpotifyAuthError.invalidURL
-        }
+        let url = SpotifyConfig.tokenRefreshURL
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"

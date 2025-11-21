@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 /// ViewModel for creating new app playlists
 @MainActor

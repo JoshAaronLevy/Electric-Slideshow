@@ -7,6 +7,7 @@
 
 import Foundation
 import Observation
+import Combine
 
 /// ViewModel for the album list sidebar
 @MainActor

@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 /// ViewModel for managing Spotify connection state
 @MainActor
