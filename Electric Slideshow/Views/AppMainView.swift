@@ -5,7 +5,7 @@
 //  Created by Josh Levy on 11/20/25.
 //
 
-import SwiftUI
+internal import SwiftUI
 
 /// Root main content view that manages section navigation
 struct AppMainView: View {

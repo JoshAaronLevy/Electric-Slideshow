@@ -1,9 +1,12 @@
 import Foundation
-import SwiftUI
+import Combine
+internal import SwiftUI
 
 /// Service for managing Spotify OAuth authentication flow
 @MainActor
 final class SpotifyAuthService: ObservableObject {
+    var objectWillChange: ObservableObjectPublisher
+    
     static let shared = SpotifyAuthService()
     
     @Published var isAuthenticated = false

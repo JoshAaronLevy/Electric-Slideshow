@@ -1,4 +1,4 @@
-import SwiftUI
+internal import SwiftUI
 
 /// Flow view for creating a new app playlist with song selection
 struct NewPlaylistFlowView: View {

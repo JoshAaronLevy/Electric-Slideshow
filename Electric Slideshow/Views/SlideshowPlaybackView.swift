@@ -1,4 +1,4 @@
-import SwiftUI
+internal import SwiftUI
 
 /// Full-screen slideshow playback view with controls and music integration
 struct SlideshowPlaybackView: View {

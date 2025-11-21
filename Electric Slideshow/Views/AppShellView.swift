@@ -5,7 +5,7 @@
 //  Created by Josh Levy on 11/20/25.
 //
 
-import SwiftUI
+internal import SwiftUI
 
 /// Root view that manages the permission flow and navigation
 struct AppShellView: View {
