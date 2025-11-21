@@ -30,8 +30,8 @@ final class PhotoLibraryService: ObservableObject {
     // MARK: - Configuration
     
     private func configureCachingManager() {
-        // Allow a reasonable cache size for smooth scrolling
-        cachingImageManager.allowsCachingHighQualityImages = false
+        // Enable high-quality image caching for better thumbnail quality
+        cachingImageManager.allowsCachingHighQualityImages = true
     }
     
     // MARK: - Authorization
@@ -134,8 +134,8 @@ final class PhotoLibraryService: ObservableObject {
             var hasResumed = false
             
             let options = PHImageRequestOptions()
-            options.deliveryMode = .opportunistic
-            options.resizeMode = .fast
+            options.deliveryMode = .highQualityFormat
+            options.resizeMode = .exact
             options.isNetworkAccessAllowed = true
             options.isSynchronous = false
             
@@ -194,8 +194,8 @@ final class PhotoLibraryService: ObservableObject {
     func startCaching(for assets: [PhotoAsset], size: CGSize) {
         let phAssets = assets.map { $0.asset }
         let options = PHImageRequestOptions()
-        options.deliveryMode = .opportunistic
-        options.resizeMode = .fast
+        options.deliveryMode = .highQualityFormat
+        options.resizeMode = .exact
         
         cachingImageManager.startCachingImages(
             for: phAssets,
