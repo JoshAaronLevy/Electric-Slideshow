@@ -11,9 +11,13 @@ import SwiftUI
 struct SlideshowsListView: View {
     @StateObject private var viewModel = SlideshowsListViewModel()
     @EnvironmentObject private var photoService: PhotoLibraryService
+    @EnvironmentObject private var spotifyAuthService: SpotifyAuthService
+    @EnvironmentObject private var playlistsStore: PlaylistsStore
     @State private var showingNewSlideshowFlow = false
     @State private var slideshowToEdit: Slideshow?
     @State private var slideshowToDelete: Slideshow?
+    @State private var activeSlideshowForPlayback: Slideshow?
+    @StateObject private var spotifyAPIService: SpotifyAPIService
     
     // 3-column grid layout
     private let columns = [
@@ -21,6 +25,10 @@ struct SlideshowsListView: View {
         GridItem(.flexible(), spacing: 20),
         GridItem(.flexible(), spacing: 20)
     ]
+    
+    init() {
+        self._spotifyAPIService = StateObject(wrappedValue: SpotifyAPIService(authService: SpotifyAuthService.shared))
+    }
     
     var body: some View {
         NavigationStack {
@@ -68,6 +76,14 @@ struct SlideshowsListView: View {
             } message: { slideshow in
                 Text("Are you sure you want to delete \"\(slideshow.title)\"? This action cannot be undone.")
             }
+            .fullScreenCover(item: $activeSlideshowForPlayback) { slideshow in
+                SlideshowPlaybackView(
+                    slideshow: slideshow,
+                    photoService: photoService,
+                    spotifyAPIService: spotifyAuthService.isAuthenticated ? spotifyAPIService : nil,
+                    playlistsStore: playlistsStore
+                )
+            }
         }
     }
     
@@ -97,7 +113,7 @@ struct SlideshowsListView: View {
                     SlideshowCardView(
                         slideshow: slideshow,
                         onPlay: {
-                            // Will implement in Phase 4
+                            activeSlideshowForPlayback = slideshow
                         },
                         onEdit: {
                             slideshowToEdit = slideshow
