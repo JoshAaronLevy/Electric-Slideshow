@@ -5,7 +5,7 @@
 //  Created by Josh Levy on 11/20/25.
 //
 
-import SwiftUI
+internal import SwiftUI
 
 /// Sidebar view displaying the list of photo albums
 struct AlbumListView: View {

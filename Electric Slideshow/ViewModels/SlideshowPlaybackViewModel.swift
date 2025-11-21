@@ -1,5 +1,7 @@
 import Foundation
 import AppKit
+import Combine
+internal import Photos
 
 /// ViewModel for managing slideshow playback with music integration
 @MainActor
@@ -79,8 +81,15 @@ final class SlideshowPlaybackViewModel: ObservableObject {
         
         var images: [NSImage] = []
         for photo in slideshow.photos {
-            let asset = PhotoAsset(localIdentifier: photo.localIdentifier)
-            if let image = await photoService.image(for: asset, size: size) {
+            // Fetch the PHAsset using the local identifier
+            let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: [photo.localIdentifier], options: nil)
+            guard let phAsset = fetchResult.firstObject else {
+                print("Warning: Could not find photo with identifier \(photo.localIdentifier)")
+                continue
+            }
+            
+            let photoAsset = PhotoAsset(asset: phAsset)
+            if let image = await photoService.image(for: photoAsset, size: size) {
                 images.append(image)
             } else {
                 // Photo might have been deleted from library

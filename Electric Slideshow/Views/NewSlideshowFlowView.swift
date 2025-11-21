@@ -5,7 +5,7 @@
 //  Created by Josh Levy on 11/20/25.
 //
 
-import SwiftUI
+internal import SwiftUI
 
 /// Multi-step flow for creating a new slideshow
 struct NewSlideshowFlowView: View {

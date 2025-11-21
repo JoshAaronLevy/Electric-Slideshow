@@ -1,4 +1,4 @@
-import SwiftUI
+internal import SwiftUI
 
 /// Card component for displaying a slideshow in grid layout
 struct SlideshowCardView: View {
