@@ -83,7 +83,7 @@ struct AppNavigationBar: View {
             Image(systemName: section.systemImageName)
                 .font(.system(size: 17))
                 .fontWeight(isSelected ? .semibold : .regular)
-                .foregroundStyle(isSelected ? .accentColor : .secondary)
+                .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
                 .frame(width: 34, height: 34)
                 .background(
                     RoundedRectangle(cornerRadius: 7)

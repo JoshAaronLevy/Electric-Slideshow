@@ -228,7 +228,7 @@ private struct PhotoThumbnailView: View {
     @State private var isLoading = true
     @State private var isHovered = false
     
-    private let thumbnailSize = CGSize(width: 300, height: 300)
+    private let thumbnailSize = CGSize(width: 240, height: 240)
     
     var body: some View {
         ZStack(alignment: .topTrailing) {

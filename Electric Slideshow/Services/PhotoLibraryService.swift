@@ -14,7 +14,11 @@ import Combine
 /// Uses PHCachingImageManager for optimized thumbnail loading
 @MainActor
 final class PhotoLibraryService: ObservableObject {
-    @Published var authorizationStatus: PHAuthorizationStatus = .notDetermined
+    @Published var authorizationStatus: PHAuthorizationStatus = .notDetermined {
+        didSet {
+            print("🔍 PhotoLibraryService: authorizationStatus changed from \(oldValue.rawValue) to \(authorizationStatus.rawValue)")
+        }
+    }
     
     private let cachingImageManager = PHCachingImageManager()
     
@@ -26,8 +30,8 @@ final class PhotoLibraryService: ObservableObject {
     // MARK: - Configuration
     
     private func configureCachingManager() {
-        // Allow a reasonable cache size for smooth scrolling
-        cachingImageManager.allowsCachingHighQualityImages = false
+        // Enable high-quality image caching for better thumbnail quality
+        cachingImageManager.allowsCachingHighQualityImages = true
     }
     
     // MARK: - Authorization
@@ -40,9 +44,21 @@ final class PhotoLibraryService: ObservableObject {
     /// Request permission to access the photo library
     @MainActor
     func requestAuthorization() async -> Bool {
+        print("🔍 PhotoLibraryService: Starting requestAuthorization()")
+        print("🔍 PhotoLibraryService: Current authorization status before request: \(authorizationStatus.rawValue)")
+        print("🔍 PhotoLibraryService: Bundle ID: \(Bundle.main.bundleIdentifier ?? "nil")")
+        print("🔍 PhotoLibraryService: About to call PHPhotoLibrary.requestAuthorization(for: .readWrite)")
+        
         let status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+        
+        print("🔍 PhotoLibraryService: PHPhotoLibrary.requestAuthorization() completed")
+        print("🔍 PhotoLibraryService: New authorization status: \(status.rawValue)")
+        
         authorizationStatus = status
-        return status == .authorized || status == .limited
+        
+        let result = status == .authorized || status == .limited
+        print("🔍 PhotoLibraryService: requestAuthorization() returning: \(result)")
+        return result
     }
     
     // MARK: - Fetching Albums & Assets
@@ -115,9 +131,11 @@ final class PhotoLibraryService: ObservableObject {
     /// This method can be called concurrently for multiple assets
     func thumbnail(for photoAsset: PhotoAsset, size: CGSize) async -> NSImage? {
         return await withCheckedContinuation { continuation in
+            var hasResumed = false
+            
             let options = PHImageRequestOptions()
-            options.deliveryMode = .opportunistic
-            options.resizeMode = .fast
+            options.deliveryMode = .highQualityFormat
+            options.resizeMode = .exact
             options.isNetworkAccessAllowed = true
             options.isSynchronous = false
             
@@ -127,6 +145,12 @@ final class PhotoLibraryService: ObservableObject {
                 contentMode: .aspectFill,
                 options: options
             ) { image, _ in
+                // PHImageManager can call this completion handler multiple times
+                // (first with low-quality, then with high-quality image)
+                // Only resume the continuation on the first call
+                guard !hasResumed else { return }
+                hasResumed = true
+                
                 // `image` is already an NSImage? on macOS
                 if let image = image {
                     continuation.resume(returning: image)
@@ -170,8 +194,8 @@ final class PhotoLibraryService: ObservableObject {
     func startCaching(for assets: [PhotoAsset], size: CGSize) {
         let phAssets = assets.map { $0.asset }
         let options = PHImageRequestOptions()
-        options.deliveryMode = .opportunistic
-        options.resizeMode = .fast
+        options.deliveryMode = .highQualityFormat
+        options.resizeMode = .exact
         
         cachingImageManager.startCachingImages(
             for: phAssets,
