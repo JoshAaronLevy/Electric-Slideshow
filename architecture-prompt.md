@@ -11,6 +11,10 @@ Project context:
   * Slideshows view: show all saved slideshows (ideally grid); hover to reveal play button; clicking play starts a full-screen slideshow with music.
   * Navigation: a top `AppNavigationBar` with sections for Slideshows, Music, Settings, and User.
 
+### Problem
+
+We are experiencing a cycle of build errors. For instance, when I have either Roo Code or Copilot Chat attempt to fix the build errors, it fixes the existing ones, but then new ones appear, often in different files. This is leading to a frustrating "whack-a-mole" situation where fixing one error creates another. And then when we fix that one, we get the original errors back. We need to get this under control. We need to get the build stable so we can continue development.
+
 ### Your task
 
 1. **Do NOT modify any existing source files or fix build errors in this step.**
