@@ -1,55 +1,49 @@
-You are helping debug a networking issue in my macOS SwiftUI app *Electric Slideshow*.
-This project handles the OAuth PKCE flow with Spotify. The app can open the Spotify consent screen and receives the redirect callback correctly. However, after the redirect, the app logs this error:
+I need help fixing a specific macOS SwiftUI behavior in this project.
 
-```
-Token exchange failed: A server with the specified hostname could not be found.
-NSErrorFailingURLStringKey=https://electric-slideshow-server.onrender.com/auth/spotify/token
-Code=-1003
-```
+### **🧩 The Problem**
 
-Important details:
+After the Spotify OAuth callback (via the custom URL scheme `com.electricslideshow://callback`):
 
-* The backend is a Node/Express service hosted on Render:
-  [https://electric-slideshow-server.onrender.com](https://electric-slideshow-server.onrender.com)
-* Visiting this URL in the browser works.
-* The token endpoint is supposed to be:
-  POST [https://electric-slideshow-server.onrender.com/auth/spotify/token](https://electric-slideshow-server.onrender.com/auth/spotify/token)
-* The app DOES receive the OAuth callback correctly via the custom URL scheme.
-* The failure occurs **when the Swift code tries to contact the backend token endpoint.**
+* The app creates a **new tab/window**, starting at the default Slideshow screen.
+* The original Music tab still shows “Connect to Spotify”.
+* The new tab's Music view shows “Connected to Spotify”, meaning the right state is being updated but **in a different window**.
 
-### **What I need you to do**
+This happens because the app uses **`WindowGroup`**, which allows multiple windows/tabs, and macOS treats a URL-open event as a request to spawn a new scene.
 
-1. Search the entire Swift project for:
+### **🎯 What I need you to do**
 
-   * Anywhere the backend URL or base URL is defined.
-   * Any config, constant, struct, or environment injection that defines the back-end hostname.
-   * Any URL construction using `URL(string:)`, `URLComponents`, or `appendingPathComponent`.
+1. **Replace `WindowGroup` with a single `Window` scene** in
+   **`Electric_SlideshowApp.swift`** (path: `/mnt/data/Electric_SlideshowApp.swift`).
 
-2. Verify that the backend URL in the Swift code:
+   * The new scene should look like:
 
-   * Exactly matches `https://electric-slideshow-server.onrender.com`
-   * Uses HTTPS (not HTTP)
-   * Has no trailing spaces, newline characters, or hidden characters
-   * Is not conditionally overwritten in DEBUG / RELEASE blocks
-   * Is not still pointing at the old `slideshow-buddy-server` URL
+     ```swift
+     Window("Electric Slideshow", id: "mainWindow") {
+         AppShellView(photoService: photoService)
+             .environmentObject(photoService)
+             .environmentObject(spotifyAuthService)
+             .environmentObject(playlistsStore)
+             .onOpenURL { url in
+                 if url.scheme == "com.electricslideshow" {
+                     Task {
+                         await spotifyAuthService.handleCallback(url: url)
+                     }
+                 }
+             }
+     }
+     ```
 
-3. Look for logic that handles the Spotify callback.
-   Find the code that extracts the `code` from the redirect and calls the token exchange method.
-   Confirm the token-exchange method is being called with the correct URL.
+   * Ensure the `.commands` modifier remains intact.
 
-4. Inspect the exact code that creates and performs the URLRequest to `/auth/spotify/token` and verify that:
+   * Remove or adjust the existing `WindowGroup` so that only one main window is ever created.
 
-   * The URL is constructed correctly
-   * It is not accidentally creating a malformed URL like `"https: //electric..."`
-   * It is not appending paths incorrectly (double slashes, missing slashes, etc.)
-   * It is using POST, not GET
+2. **Verify that MusicView (and its parent views) read the authentication state directly from the existing `@EnvironmentObject var spotifyAuthService: SpotifyAuthService`.**
 
-5. If you find any incorrect URLs, stale config, or malformed URL construction, please:
+   * Do NOT introduce any new singletons or new instances of the service.
+   * Ensure MusicView does NOT cache `isAuthenticated` in local `@State`.
 
-   * Point them out
-   * Suggest the minimal code change needed
-   * Apply the fix in the codebase if appropriate
+3. **Do NOT create any new windows, scenes, or tabs in response to the URL callback.**
+   The callback must update the **existing** window only.
 
-Do NOT alter any unrelated architecture. Only focus on making sure the Swift app is calling the correct backend URL for the token exchange.
-
-When you're ready, tell me what you found and what changes (if any) you made.
+4. Make the minimal required code edits and show me the diff.
+   If anything is unclear or you detect multiple possible fixes, ask before applying.
