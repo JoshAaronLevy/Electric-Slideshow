@@ -41,7 +41,7 @@ This directory contains the phased implementation plan for Electric Slideshow MV
 
 - **Backend**: `https://slideshow-buddy-server.onrender.com` only handles OAuth token exchange
 - **App Playlists**: Stored locally in the app, NOT synced to Spotify account
-- **Naming**: References to `slideshowbuddy` / `slideshow-buddy` are correct (will be renamed later)
+- **Naming**: References to `electricslideshow` / `slideshow-buddy` are correct (will be renamed later)
 - **Direct API Calls**: App calls Spotify Web API directly for all music operations
 
 ## Implementation Notes

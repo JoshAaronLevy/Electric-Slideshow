@@ -6,7 +6,7 @@
 //
 
 import Foundation
-internal import Photos
+import Photos
 import AppKit
 
 /// Represents a photo asset from the user's library

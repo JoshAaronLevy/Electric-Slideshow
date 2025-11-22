@@ -7,7 +7,7 @@ All 6 stages of Spotify authentication have been implemented successfully.
 ### Stage 1: Configuration & Models
 - ✅ `Electric Slideshow/Config/SpotifyConfig.swift` - Spotify configuration constants
 - ✅ `Electric Slideshow/Models/SpotifyAuthToken.swift` - OAuth token model
-- ✅ Updated `Electric Slideshow.xcodeproj/project.pbxproj` - Added URL scheme (com.slideshowbuddy)
+- ✅ Updated `Electric Slideshow.xcodeproj/project.pbxproj` - Added URL scheme (com.electricslideshow)
 
 ### Stage 2: Keychain Service
 - ✅ `Electric Slideshow/Services/KeychainService.swift` - Secure token storage using macOS Keychain
@@ -44,7 +44,7 @@ All 6 stages of Spotify authentication have been implemented successfully.
 ### Known Requirements
 - macOS 14.0+ (for CryptoKit and modern SwiftUI features)
 - App Sandbox enabled with network access
-- URL scheme registered: `com.slideshowbuddy://callback`
+- URL scheme registered: `com.electricslideshow://callback`
 
 ## Architecture Summary
 

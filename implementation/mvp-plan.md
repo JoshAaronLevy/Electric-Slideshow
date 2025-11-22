@@ -47,7 +47,7 @@ A macOS app for creating and playing photo slideshows with Spotify music integra
 - No user data storage
 
 ### macOS App
-- **Spotify Auth**: OAuth PKCE flow with custom URL scheme (`com.slideshowbuddy://callback`)
+- **Spotify Auth**: OAuth PKCE flow with custom URL scheme (`com.electricslideshow://callback`)
 - **Token Storage**: Keychain for secure token management
 - **Spotify API**: Direct calls to `https://api.spotify.com/v1` for all music operations
 - **Local Storage**:

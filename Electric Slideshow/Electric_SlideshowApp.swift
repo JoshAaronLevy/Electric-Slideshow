@@ -21,7 +21,7 @@ struct Electric_SlideshowApp: App {
                 .environmentObject(playlistsStore)
                 .onOpenURL { url in
                     // Handle OAuth callback
-                    if url.scheme == "com.slideshowbuddy" {
+                    if url.scheme == "com.electricslideshow" {
                         Task {
                             await spotifyAuthService.handleCallback(url: url)
                         }

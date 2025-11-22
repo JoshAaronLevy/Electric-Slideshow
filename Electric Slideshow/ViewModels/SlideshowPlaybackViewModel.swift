@@ -1,7 +1,7 @@
 import Foundation
 import AppKit
 import Combine
-internal import Photos
+import Photos
 
 /// ViewModel for managing slideshow playback with music integration
 @MainActor

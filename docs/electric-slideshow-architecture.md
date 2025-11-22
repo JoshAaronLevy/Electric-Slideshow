@@ -25,7 +25,7 @@ macOS SwiftUI app (MVVM architecture) that creates photo slideshows with Spotify
 2. **`SpotifyAuthService.shared`** — OAuth manager (singleton pattern)
 3. **`PlaylistsStore`** — App playlist persistence
 
-**OAuth Callback:** Handles `com.slideshowbuddy://callback` via `.onOpenURL`
+**OAuth Callback:** Handles `com.electricslideshow://callback` via `.onOpenURL`
 
 ---
 
@@ -241,7 +241,6 @@ Electric_SlideshowApp → AppShellView (permissions) → AppMainView → AppNavi
 - **Fix:** Standardize on environment object
 
 **ISSUE 8: Import Statement Inconsistencies**
-- Mix of `internal import` and `import`
 - **Impact:** Potential visibility issues
 
 **ISSUE 9: Error Handling Inconsistencies**
@@ -276,7 +275,6 @@ Electric_SlideshowApp → AppShellView (permissions) → AppMainView → AppNavi
 6. **Consistent service access** — Use environment objects, not mixed param passing
 7. **Add timer cleanup** — Implement `deinit` in `SlideshowPlaybackViewModel`
 8. **Validate PHAssets** — Check assets exist before playback, alert user of missing photos
-9. **Standardize imports** — Consistent use of `internal import` vs `import`
 10. **Error handling strategy** — Define per-layer approach (throws vs published vs silent)
 
 ---

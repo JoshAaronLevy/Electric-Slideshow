@@ -6,7 +6,7 @@
 //
 
 import Foundation
-internal import Photos
+import Photos
 import Combine
 
 /// Manages photo library browsing and selection for slideshow creation

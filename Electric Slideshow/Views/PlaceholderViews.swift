@@ -5,7 +5,7 @@
 //  Created by Josh Levy on 11/20/25.
 //
 
-internal import SwiftUI
+import SwiftUI
 
 /// Placeholder view for the Music section
 struct MusicPlaceholderView: View {

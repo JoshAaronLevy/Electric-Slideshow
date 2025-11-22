@@ -1,4 +1,4 @@
-internal import SwiftUI
+import SwiftUI
 
 /// View for selecting songs from Spotify library
 struct TrackSelectionView: View {

@@ -7,7 +7,7 @@ final class KeychainService {
     
     private init() {}
     
-    private let service = "com.slideshowbuddy.Electric-Slideshow"
+    private let service = "com.electricslideshow.Electric-Slideshow"
     
     // MARK: - Save
     

@@ -1,8 +1,9 @@
 import Foundation
+import Combine
 
 /// Service for making direct API calls to Spotify Web API
 @MainActor
-final class SpotifyAPIService {
+final class SpotifyAPIService: ObservableObject {
     private let authService: SpotifyAuthService
     private let baseURL = SpotifyConfig.spotifyAPIBaseURL
     
