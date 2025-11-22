@@ -24,9 +24,15 @@ final class SpotifyAPIService: ObservableObject {
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
-        guard let httpResponse = response as? HTTPURLResponse else {
-            print("[SpotifyAPI] ERROR: Invalid response type")
-            throw APIError.requestFailed
+        guard let httpResponse = response as? HTTPURLResponse,
+            (200...299).contains(httpResponse.statusCode) else {
+
+            print("[SpotifyAPI] ERROR: Invalid response type, status: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
+
+            throw APIError.requestFailed(
+                statusCode: (response as? HTTPURLResponse)?.statusCode ?? -1,
+                message: "Unexpected response from Spotify API"
+            )
         }
         
         print("[SpotifyAPI] Profile request status: \(httpResponse.statusCode)")
@@ -254,11 +260,11 @@ final class SpotifyAPIService: ObservableObject {
     enum APIError: LocalizedError {
         case requestFailed(statusCode: Int, message: String)
         case playbackFailed
-        
+
         var errorDescription: String? {
             switch self {
-            case .requestFailed(let statusCode, let message):
-                return "Spotify API request failed (\(statusCode)): \(message)"
+            case let .requestFailed(statusCode, message):
+                return "Failed Spotify API call (\(statusCode)): \(message)"
             case .playbackFailed:
                 return "Failed to control playback"
             }
