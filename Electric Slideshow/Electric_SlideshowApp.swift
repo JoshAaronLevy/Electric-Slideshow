@@ -14,7 +14,7 @@ struct Electric_SlideshowApp: App {
     @StateObject private var playlistsStore = PlaylistsStore()
     
     var body: some Scene {
-        WindowGroup {
+        Window("Electric Slideshow", id: "mainWindow") {
             AppShellView(photoService: photoService)
                 .environmentObject(photoService)
                 .environmentObject(spotifyAuthService)
@@ -28,7 +28,6 @@ struct Electric_SlideshowApp: App {
                     }
                 }
         }
-        .windowStyle(.automatic)
         .commands {
             CommandGroup(replacing: .newItem) { }
         }
