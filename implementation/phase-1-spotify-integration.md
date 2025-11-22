@@ -4,7 +4,7 @@
 Implement OAuth PKCE authentication flow for Spotify, with token management in Keychain and direct Spotify Web API integration.
 
 **Backend**: `https://slideshow-buddy-server.onrender.com` (OAuth token exchange only)  
-**Redirect URI**: `com.slideshowbuddy://callback`  
+**Redirect URI**: `com.electricslideshow://callback`  
 **Required Scopes**: `playlist-read-private playlist-read-collaborative user-library-read user-read-playback-state user-modify-playback-state`
 
 ---
@@ -15,7 +15,7 @@ Implement OAuth PKCE authentication flow for Spotify, with token management in K
 ```swift
 struct SpotifyConfig {
     static let clientId = "YOUR_SPOTIFY_CLIENT_ID" // From Spotify Dashboard
-    static let redirectURI = "com.slideshowbuddy://callback"
+    static let redirectURI = "com.electricslideshow://callback"
     static let tokenExchangeURL = URL(string: "https://slideshow-buddy-server.onrender.com/auth/spotify/token")!
     static let tokenRefreshURL = URL(string: "https://slideshow-buddy-server.onrender.com/auth/spotify/refresh")!
     
@@ -55,7 +55,7 @@ Add URL scheme handler:
     <dict>
         <key>CFBundleURLSchemes</key>
         <array>
-            <string>com.slideshowbuddy</string>
+            <string>com.electricslideshow</string>
         </array>
         <key>CFBundleURLName</key>
         <string>Spotify OAuth Callback</string>
@@ -73,7 +73,7 @@ import Foundation
 import Security
 
 final class KeychainService {
-    private let service = "com.slideshowbuddy.spotify"
+    private let service = "com.electricslideshow.spotify"
     
     enum KeychainError: Error {
         case itemNotFound
@@ -315,7 +315,7 @@ struct Electric_SlideshowApp: App {
                 .environmentObject(spotifyAuthService)
                 .onOpenURL { url in
                     Task {
-                        if url.scheme == "com.slideshowbuddy" {
+                        if url.scheme == "com.electricslideshow" {
                             try? await spotifyAuthService.handleCallback(url: url)
                         }
                     }

@@ -8,10 +8,10 @@
 import Foundation
 
 struct SpotifyConfig {
-    static let clientId = "485cef747f614337b334513a7b9a7322"
-    static let redirectURI = "com.slideshowbuddy://callback"
-    static let tokenExchangeURL = URL(string: "https://slideshow-buddy-server.onrender.com/auth/spotify/token")!
-    static let tokenRefreshURL = URL(string: "https://slideshow-buddy-server.onrender.com/auth/spotify/refresh")!
+    static let clientId = "a5420653f68e4295b5a8fbca7b98cd3a"
+    static let redirectURI = "com.electricslideshow://callback"
+    static let tokenExchangeURL = URL(string: "https://electric-slideshow-server.onrender.com/auth/spotify/token")!
+    static let tokenRefreshURL = URL(string: "https://electric-slideshow-server.onrender.com/auth/spotify/refresh")!
     
     static let scopes = [
         "playlist-read-private",

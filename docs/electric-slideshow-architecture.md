@@ -25,7 +25,7 @@ macOS SwiftUI app (MVVM architecture) that creates photo slideshows with Spotify
 2. **`SpotifyAuthService.shared`** — OAuth manager (singleton pattern)
 3. **`PlaylistsStore`** — App playlist persistence
 
-**OAuth Callback:** Handles `com.slideshowbuddy://callback` via `.onOpenURL`
+**OAuth Callback:** Handles `com.electricslideshow://callback` via `.onOpenURL`
 
 ---
 
