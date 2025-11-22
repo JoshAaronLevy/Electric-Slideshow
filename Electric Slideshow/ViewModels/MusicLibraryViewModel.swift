@@ -19,6 +19,7 @@ final class MusicLibraryViewModel: ObservableObject {
     func loadLibrary() async {
         isLoading = true
         errorMessage = nil
+        print("[MusicLibraryVM] Starting to load Spotify library...")
         
         async let playlistsResult = apiService.fetchUserPlaylists()
         async let tracksResult = apiService.fetchSavedTracks()
@@ -27,8 +28,10 @@ final class MusicLibraryViewModel: ObservableObject {
             spotifyPlaylists = try await playlistsResult
             savedTracks = try await tracksResult
             isLoading = false
+            print("[MusicLibraryVM] Successfully loaded \(spotifyPlaylists.count) playlists and \(savedTracks.count) tracks")
         } catch {
-            errorMessage = "Failed to load Spotify library"
+            errorMessage = "Failed to load Spotify library: \(error.localizedDescription)"
+            print("[MusicLibraryVM] ERROR: \(error)")
             isLoading = false
         }
     }

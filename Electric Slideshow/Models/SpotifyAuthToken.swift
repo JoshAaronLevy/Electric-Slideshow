@@ -13,6 +13,7 @@ struct SpotifyAuthToken: Codable {
     let expiresIn: Int // seconds
     let tokenType: String
     let scope: String
+    let issuedAt: Date
     
     enum CodingKeys: String, CodingKey {
         case accessToken = "access_token"
@@ -20,9 +21,21 @@ struct SpotifyAuthToken: Codable {
         case expiresIn = "expires_in"
         case tokenType = "token_type"
         case scope
+        case issuedAt
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        accessToken = try container.decode(String.self, forKey: .accessToken)
+        refreshToken = try container.decode(String.self, forKey: .refreshToken)
+        expiresIn = try container.decode(Int.self, forKey: .expiresIn)
+        tokenType = try container.decode(String.self, forKey: .tokenType)
+        scope = try container.decode(String.self, forKey: .scope)
+        // If issuedAt is not in the JSON (for tokens received from backend), use current time
+        issuedAt = (try? container.decode(Date.self, forKey: .issuedAt)) ?? Date()
     }
     
     var expiryDate: Date {
-        Date().addingTimeInterval(TimeInterval(expiresIn))
+        issuedAt.addingTimeInterval(TimeInterval(expiresIn))
     }
 }

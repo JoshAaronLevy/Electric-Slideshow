@@ -54,22 +54,38 @@ final class SpotifyAuthService: ObservableObject {
     
     /// Handles the OAuth callback with authorization code
     func handleCallback(url: URL) async {
+        print("[SpotifyAuth] Handling callback URL: \(url.absoluteString)")
+        
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
               let code = components.queryItems?.first(where: { $0.name == "code" })?.value else {
             authError = "Invalid callback URL"
+            print("[SpotifyAuth] ERROR: Invalid callback URL or missing code parameter")
             return
         }
         
         guard let verifier = codeVerifier else {
             authError = "Code verifier not found"
+            print("[SpotifyAuth] ERROR: Code verifier not found")
             return
+        }
+        
+        // Clear any existing tokens before attempting new exchange
+        // This prevents showing "connected" status with stale tokens if exchange fails
+        do {
+            try KeychainService.shared.delete(forKey: keychainKey)
+            isAuthenticated = false
+            print("[SpotifyAuth] Cleared existing tokens before exchange")
+        } catch {
+            print("[SpotifyAuth] No existing tokens to clear or error clearing: \(error)")
         }
         
         do {
             try await exchangeCodeForToken(code: code, codeVerifier: verifier)
             self.codeVerifier = nil // Clear after use
+            print("[SpotifyAuth] Token exchange successful")
         } catch {
             authError = "Token exchange failed: \(error.localizedDescription)"
+            print("[SpotifyAuth] ERROR: Token exchange failed: \(error)")
         }
     }
     
@@ -112,6 +128,7 @@ final class SpotifyAuthService: ObservableObject {
     
     private func exchangeCodeForToken(code: String, codeVerifier: String) async throws {
         let url = SpotifyConfig.tokenExchangeURL
+        print("[SpotifyAuth] Exchanging code for token at: \(url.absoluteString)")
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -127,12 +144,22 @@ final class SpotifyAuthService: ObservableObject {
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("[SpotifyAuth] ERROR: Invalid response type")
+            throw SpotifyAuthError.serverError
+        }
+        
+        print("[SpotifyAuth] Backend response status: \(httpResponse.statusCode)")
+        
+        if httpResponse.statusCode != 200 {
+            let errorBody = String(data: data, encoding: .utf8) ?? "(no body)"
+            print("[SpotifyAuth] ERROR: Backend returned \(httpResponse.statusCode): \(errorBody)")
             throw SpotifyAuthError.serverError
         }
         
         let token = try JSONDecoder().decode(SpotifyAuthToken.self, from: data)
         try KeychainService.shared.save(token, forKey: keychainKey)
+        print("[SpotifyAuth] Token saved to keychain successfully")
         
         isAuthenticated = true
         authError = nil
@@ -140,6 +167,7 @@ final class SpotifyAuthService: ObservableObject {
     
     private func refreshAccessToken(refreshToken: String) async throws -> String {
         let url = SpotifyConfig.tokenRefreshURL
+        print("[SpotifyAuth] Refreshing access token at: \(url.absoluteString)")
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -153,12 +181,22 @@ final class SpotifyAuthService: ObservableObject {
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("[SpotifyAuth] ERROR: Invalid response type during refresh")
+            throw SpotifyAuthError.serverError
+        }
+        
+        print("[SpotifyAuth] Refresh response status: \(httpResponse.statusCode)")
+        
+        if httpResponse.statusCode != 200 {
+            let errorBody = String(data: data, encoding: .utf8) ?? "(no body)"
+            print("[SpotifyAuth] ERROR: Refresh failed with \(httpResponse.statusCode): \(errorBody)")
             throw SpotifyAuthError.serverError
         }
         
         let newToken = try JSONDecoder().decode(SpotifyAuthToken.self, from: data)
         try KeychainService.shared.save(newToken, forKey: keychainKey)
+        print("[SpotifyAuth] Token refreshed and saved successfully")
         
         return newToken.accessToken
     }

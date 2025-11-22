@@ -15,14 +15,26 @@ final class SpotifyAPIService: ObservableObject {
     
     func fetchUserProfile() async throws -> SpotifyUser {
         let url = baseURL.appendingPathComponent("me")
+        print("[SpotifyAPI] Fetching user profile from: \(url.absoluteString)")
+        
         let token = try await authService.getValidAccessToken()
         
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("[SpotifyAPI] ERROR: Invalid response type")
             throw APIError.requestFailed
+        }
+        
+        print("[SpotifyAPI] Profile request status: \(httpResponse.statusCode)")
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let errorBody = String(data: data, encoding: .utf8) ?? "(no body)"
+            print("[SpotifyAPI] ERROR: Profile request failed with \(httpResponse.statusCode): \(errorBody)")
+            throw APIError.requestFailed(statusCode: httpResponse.statusCode, message: errorBody)
         }
         
         return try JSONDecoder().decode(SpotifyUser.self, from: data)
@@ -32,14 +44,26 @@ final class SpotifyAPIService: ObservableObject {
     
     func fetchUserPlaylists() async throws -> [SpotifyPlaylist] {
         let url = baseURL.appendingPathComponent("me/playlists")
+        print("[SpotifyAPI] Fetching user playlists from: \(url.absoluteString)")
+        
         let token = try await authService.getValidAccessToken()
         
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
-            throw APIError.requestFailed
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("[SpotifyAPI] ERROR: Invalid response type")
+            throw APIError.requestFailed(statusCode: 0, message: "Invalid response")
+        }
+        
+        print("[SpotifyAPI] Playlists request status: \(httpResponse.statusCode)")
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let errorBody = String(data: data, encoding: .utf8) ?? "(no body)"
+            print("[SpotifyAPI] ERROR: Playlists request failed with \(httpResponse.statusCode): \(errorBody)")
+            throw APIError.requestFailed(statusCode: httpResponse.statusCode, message: errorBody)
         }
         
         let playlistsResponse = try JSONDecoder().decode(SpotifyPlaylistsResponse.self, from: data)
@@ -48,14 +72,26 @@ final class SpotifyAPIService: ObservableObject {
     
     func fetchPlaylistTracks(playlistId: String) async throws -> [SpotifyTrack] {
         let url = baseURL.appendingPathComponent("playlists/\(playlistId)/tracks")
+        print("[SpotifyAPI] Fetching playlist tracks from: \(url.absoluteString)")
+        
         let token = try await authService.getValidAccessToken()
         
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
-            throw APIError.requestFailed
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("[SpotifyAPI] ERROR: Invalid response type")
+            throw APIError.requestFailed(statusCode: 0, message: "Invalid response")
+        }
+        
+        print("[SpotifyAPI] Playlist tracks request status: \(httpResponse.statusCode)")
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let errorBody = String(data: data, encoding: .utf8) ?? "(no body)"
+            print("[SpotifyAPI] ERROR: Playlist tracks request failed with \(httpResponse.statusCode): \(errorBody)")
+            throw APIError.requestFailed(statusCode: httpResponse.statusCode, message: errorBody)
         }
         
         let tracksResponse = try JSONDecoder().decode(SpotifyTracksResponse.self, from: data)
@@ -71,13 +107,25 @@ final class SpotifyAPIService: ObservableObject {
             URLQueryItem(name: "offset", value: "\(offset)")
         ]
         
+        print("[SpotifyAPI] Fetching saved tracks from: \(components.url!.absoluteString)")
+        
         let token = try await authService.getValidAccessToken()
         var request = URLRequest(url: components.url!)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
-            throw APIError.requestFailed
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("[SpotifyAPI] ERROR: Invalid response type")
+            throw APIError.requestFailed(statusCode: 0, message: "Invalid response")
+        }
+        
+        print("[SpotifyAPI] Saved tracks request status: \(httpResponse.statusCode)")
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let errorBody = String(data: data, encoding: .utf8) ?? "(no body)"
+            print("[SpotifyAPI] ERROR: Saved tracks request failed with \(httpResponse.statusCode): \(errorBody)")
+            throw APIError.requestFailed(statusCode: httpResponse.statusCode, message: errorBody)
         }
         
         let savedTracksResponse = try JSONDecoder().decode(SpotifySavedTracksResponse.self, from: data)
@@ -101,8 +149,15 @@ final class SpotifyAPIService: ObservableObject {
         }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         
-        let (_, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.playbackFailed
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let errorBody = String(data: data, encoding: .utf8) ?? "(no body)"
+            print("[SpotifyAPI] ERROR: Start playback failed with \(httpResponse.statusCode): \(errorBody)")
             throw APIError.playbackFailed
         }
     }
@@ -115,8 +170,15 @@ final class SpotifyAPIService: ObservableObject {
         request.httpMethod = "PUT"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (_, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.playbackFailed
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let errorBody = String(data: data, encoding: .utf8) ?? "(no body)"
+            print("[SpotifyAPI] ERROR: Pause playback failed with \(httpResponse.statusCode): \(errorBody)")
             throw APIError.playbackFailed
         }
     }
@@ -129,8 +191,15 @@ final class SpotifyAPIService: ObservableObject {
         request.httpMethod = "POST"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (_, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.playbackFailed
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let errorBody = String(data: data, encoding: .utf8) ?? "(no body)"
+            print("[SpotifyAPI] ERROR: Skip to next failed with \(httpResponse.statusCode): \(errorBody)")
             throw APIError.playbackFailed
         }
     }
@@ -143,8 +212,15 @@ final class SpotifyAPIService: ObservableObject {
         request.httpMethod = "POST"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (_, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.playbackFailed
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let errorBody = String(data: data, encoding: .utf8) ?? "(no body)"
+            print("[SpotifyAPI] ERROR: Skip to previous failed with \(httpResponse.statusCode): \(errorBody)")
             throw APIError.playbackFailed
         }
     }
@@ -158,7 +234,7 @@ final class SpotifyAPIService: ObservableObject {
         
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.requestFailed
+            throw APIError.requestFailed(statusCode: 0, message: "Invalid response")
         }
         
         // 204 means no active playback
@@ -167,20 +243,22 @@ final class SpotifyAPIService: ObservableObject {
         }
         
         guard (200...299).contains(httpResponse.statusCode) else {
-            throw APIError.requestFailed
+            let errorBody = String(data: data, encoding: .utf8) ?? "(no body)"
+            print("[SpotifyAPI] ERROR: Get playback state failed with \(httpResponse.statusCode): \(errorBody)")
+            throw APIError.requestFailed(statusCode: httpResponse.statusCode, message: errorBody)
         }
         
         return try JSONDecoder().decode(SpotifyPlaybackState.self, from: data)
     }
     
     enum APIError: LocalizedError {
-        case requestFailed
+        case requestFailed(statusCode: Int, message: String)
         case playbackFailed
         
         var errorDescription: String? {
             switch self {
-            case .requestFailed:
-                return "Failed to communicate with Spotify API"
+            case .requestFailed(let statusCode, let message):
+                return "Spotify API request failed (\(statusCode)): \(message)"
             case .playbackFailed:
                 return "Failed to control playback"
             }
