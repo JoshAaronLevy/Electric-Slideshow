@@ -15,6 +15,7 @@ struct AppNavigationBar: View {
     let sections: [AppSection]
     let selectedSection: AppSection
     let onSectionSelected: (AppSection) -> Void
+    let onUserIconTapped: () -> Void
     
     var body: some View {
         HStack(spacing: 0) {
@@ -78,7 +79,11 @@ struct AppNavigationBar: View {
         let isSelected = selectedSection == section
         
         return Button {
-            onSectionSelected(section)
+            if section == .user {
+                onUserIconTapped()
+            } else {
+                onSectionSelected(section)
+            }
         } label: {
             Image(systemName: section.systemImageName)
                 .font(.system(size: 17))
@@ -105,7 +110,8 @@ struct AppNavigationBar: View {
             currentSectionTitle: "Slideshows",
             sections: [.slideshows, .music, .settings, .user],
             selectedSection: .slideshows,
-            onSectionSelected: { _ in }
+            onSectionSelected: { _ in },
+            onUserIconTapped: { }
         )
         Spacer()
     }
@@ -120,7 +126,8 @@ struct AppNavigationBar: View {
             currentSectionTitle: "Music",
             sections: [.slideshows, .music, .settings, .user],
             selectedSection: .music,
-            onSectionSelected: { _ in }
+            onSectionSelected: { _ in },
+            onUserIconTapped: { }
         )
         Spacer()
     }
@@ -135,7 +142,8 @@ struct AppNavigationBar: View {
             currentSectionTitle: "Settings",
             sections: [.slideshows, .music, .settings, .user],
             selectedSection: .settings,
-            onSectionSelected: { _ in }
+            onSectionSelected: { _ in },
+            onUserIconTapped: { }
         )
         Spacer()
     }
@@ -151,7 +159,8 @@ struct AppNavigationBar: View {
             currentSectionTitle: "Slideshows",
             sections: [.slideshows, .music, .settings, .user],
             selectedSection: .slideshows,
-            onSectionSelected: { _ in }
+            onSectionSelected: { _ in },
+            onUserIconTapped: { }
         )
         Spacer()
     }
@@ -166,7 +175,8 @@ struct AppNavigationBar: View {
             currentSectionTitle: "Music",
             sections: [.slideshows, .music, .settings, .user],
             selectedSection: .music,
-            onSectionSelected: { _ in }
+            onSectionSelected: { _ in },
+            onUserIconTapped: { }
         )
         Spacer()
     }

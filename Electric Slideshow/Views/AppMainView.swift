@@ -10,6 +10,7 @@ import SwiftUI
 /// Root main content view that manages section navigation
 struct AppMainView: View {
     @State private var selectedSection: AppSection = .slideshows
+    @State private var showingUserProfile = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -22,6 +23,9 @@ struct AppMainView: View {
                 selectedSection: selectedSection,
                 onSectionSelected: { section in
                     handleSectionSelection(section)
+                },
+                onUserIconTapped: {
+                    showingUserProfile = true
                 }
             )
             
@@ -39,6 +43,9 @@ struct AppMainView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .sheet(isPresented: $showingUserProfile) {
+            UserProfileModal()
         }
     }
     
