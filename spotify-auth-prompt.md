@@ -1,49 +1,77 @@
-I need help fixing a specific macOS SwiftUI behavior in this project.
+You are helping debug Spotify integration in a macOS SwiftUI app called Electric Slideshow.
 
-### **🧩 The Problem**
+### Context
 
-After the Spotify OAuth callback (via the custom URL scheme `com.electricslideshow://callback`):
+The app uses a Node/Express backend for Spotify OAuth PKCE and Web API calls.
 
-* The app creates a **new tab/window**, starting at the default Slideshow screen.
-* The original Music tab still shows “Connect to Spotify”.
-* The new tab's Music view shows “Connected to Spotify”, meaning the right state is being updated but **in a different window**.
+Current behavior:
 
-This happens because the app uses **`WindowGroup`**, which allows multiple windows/tabs, and macOS treats a URL-open event as a request to spawn a new scene.
+- When I click “Connect to Spotify” in the app, it opens the Spotify consent page in my browser.
+- I click “Agree” and the app is brought back to the foreground via the custom URL scheme.
+- At the top of the app, the UI now says I am “Connected to Spotify”.
+- However:
+  - When I click the button to create a new slideshow playlist from my Spotify account/library, the modal shows: **“Failed to load Spotify Library”**.
+  - When I click the user icon in the top navbar, the modal that should show my name/email/account info instead shows: **“Failed to Load Profile”**.
+- In my Spotify account page (in Chrome), under connected apps, I can see **Electric Slideshow** listed.
+- The original Spotify consent web page is still sitting on the “Agree” screen; it doesn’t redirect to a nice success page, which might or might not be relevant.
 
-### **🎯 What I need you to do**
+So: the app thinks I’m connected, but all subsequent Spotify data calls fail.
 
-1. **Replace `WindowGroup` with a single `Window` scene** in
-   **`Electric_SlideshowApp.swift`** (path: `/mnt/data/Electric_SlideshowApp.swift`).
+### Files and components you should inspect
 
-   * The new scene should look like:
+In this Swift project, please:
 
-     ```swift
-     Window("Electric Slideshow", id: "mainWindow") {
-         AppShellView(photoService: photoService)
-             .environmentObject(photoService)
-             .environmentObject(spotifyAuthService)
-             .environmentObject(playlistsStore)
-             .onOpenURL { url in
-                 if url.scheme == "com.electricslideshow" {
-                     Task {
-                         await spotifyAuthService.handleCallback(url: url)
-                     }
-                 }
-             }
-     }
-     ```
+1. Examine `SpotifyAuthService.swift` and find:
+   - The `handleCallback(url:)` implementation that processes the redirect from Spotify.
+   - How the authorization `code`, `state`, and any `error` are extracted from the callback URL.
+   - The method that calls the backend token endpoint (for exchanging the code for access/refresh tokens).
+   - Where and how access/refresh tokens are stored (in memory, Keychain, UserDefaults, etc.).
+   - Where `isAuthenticated` is set to `true`.
 
-   * Ensure the `.commands` modifier remains intact.
+2. Examine `SpotifyAPIService.swift` and:
+   - Identify the methods used to fetch:
+     - User profile (for the “profile” modal).
+     - Spotify library / playlists (for the “Failed to load Spotify Library” modal).
+   - Check what base URL they use to call the backend (and confirm it matches the new backend hostname).
+   - Check how the access token is passed along (Authorization headers, query params, etc.).
+   - Confirm they are using the same token that `SpotifyAuthService` receives/stores.
 
-   * Remove or adjust the existing `WindowGroup` so that only one main window is ever created.
+3. Find the Swift views / view models that show:
+   - “Connected to Spotify”
+   - “Failed to load Spotify Library”
+   - “Failed to Load Profile”
+   Those views likely depend on some `@EnvironmentObject` or `ObservableObject` (such as `SpotifyAuthService` and/or `SpotifyAPIService`) and may have logic to display those error states.
 
-2. **Verify that MusicView (and its parent views) read the authentication state directly from the existing `@EnvironmentObject var spotifyAuthService: SpotifyAuthService`.**
+### What I want you to do
 
-   * Do NOT introduce any new singletons or new instances of the service.
-   * Ensure MusicView does NOT cache `isAuthenticated` in local `@State`.
+1. **Trace the whole flow in the Swift code path:**
+   - From callback URL (`onOpenURL` or equivalent) → `SpotifyAuthService.handleCallback(url:)` → token-exchange request → token storage → API calls to load profile/library → UI state in the Music/playlist/profile views.
 
-3. **Do NOT create any new windows, scenes, or tabs in response to the URL callback.**
-   The callback must update the **existing** window only.
+2. **Verify the following and fix if needed:**
+   - `handleCallback(url:)`:
+     - Must only treat the flow as successful if the token exchange backend call actually succeeds and returns valid tokens.
+     - Should NOT set `isAuthenticated = true` just because a code exists; it should set it only after a successful token exchange.
+   - Token storage:
+     - Ensure the access/refresh tokens returned by the backend are stored in a way that `SpotifyAPIService` actually reads/uses.
+   - API calls:
+     - Ensure that requests made from `SpotifyAPIService` to fetch profile and library are passing whatever token / credentials the backend expects (or hitting the correct backend routes).
+     - Ensure the base URL matches the new backend service, and there are no leftover references to the old server.
 
-4. Make the minimal required code edits and show me the diff.
-   If anything is unclear or you detect multiple possible fixes, ask before applying.
+3. Improve logging / error visibility:
+   - For the profile/library fetch methods, make sure they log (or propagate) the actual error message returned by the backend (HTTP status code and body), not just a generic “Failed to load Spotify Library/Profile”.
+   - This will help confirm whether the problem is:
+     - Bad tokens,
+     - Wrong endpoint,
+     - Backend returning 401/403/500, etc.
+
+4. Apply minimal, surgical changes:
+   - Do NOT redesign the architecture.
+   - Only adjust:
+     - The callback handling,
+     - Token state and storage,
+     - The wiring between `SpotifyAuthService` and `SpotifyAPIService`,
+     - Error handling in the views, if necessary.
+
+After you modify the code, please summarize:
+- What was wrong, and
+- What changes you made (ideally show a diff or code snippets).
