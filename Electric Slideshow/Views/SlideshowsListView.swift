@@ -5,7 +5,7 @@
 //  Created by Josh Levy on 11/20/25.
 //
 
-internal import SwiftUI
+import SwiftUI
 
 /// Main landing page listing slideshows
 struct SlideshowsListView: View {
@@ -76,7 +76,7 @@ struct SlideshowsListView: View {
             } message: { slideshow in
                 Text("Are you sure you want to delete \"\(slideshow.title)\"? This action cannot be undone.")
             }
-            .fullScreenCover(item: $activeSlideshowForPlayback) { slideshow in
+            .sheet(item: $activeSlideshowForPlayback) { slideshow in
                 SlideshowPlaybackView(
                     slideshow: slideshow,
                     photoService: photoService,

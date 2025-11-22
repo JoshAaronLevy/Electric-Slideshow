@@ -5,7 +5,7 @@
 //  Created by Josh Levy on 11/20/25.
 //
 
-internal import SwiftUI
+import SwiftUI
 
 /// Photo selection UI with album picker and multi-select grid
 struct PhotoSelectionView: View {

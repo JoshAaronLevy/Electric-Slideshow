@@ -5,7 +5,7 @@
 //  Created by Josh Levy on 11/20/25.
 //
 
-internal import SwiftUI
+import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var photoService: PhotoLibraryService

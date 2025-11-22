@@ -6,7 +6,7 @@
 //
 
 import Foundation
-internal import Photos
+import Photos
 
 /// Represents a photo album from the user's library
 struct Album: Identifiable, Hashable {

@@ -1,6 +1,6 @@
 import Foundation
 import Combine
-internal import SwiftUI
+import SwiftUI
 
 /// Store for managing app-local playlists with JSON file persistence
 @MainActor

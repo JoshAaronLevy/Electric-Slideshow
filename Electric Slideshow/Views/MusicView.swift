@@ -1,4 +1,4 @@
-internal import SwiftUI
+import SwiftUI
 
 /// View for displaying Spotify connection and managing app playlists
 struct MusicView: View {

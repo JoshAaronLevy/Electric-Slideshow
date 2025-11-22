@@ -1,4 +1,5 @@
-internal import SwiftUI
+import SwiftUI
+import Photos
 
 /// Card component for displaying a slideshow in grid layout
 struct SlideshowCardView: View {
@@ -144,10 +145,17 @@ struct SlideshowCardView: View {
     
     private func loadThumbnail() async {
         guard let firstPhoto = slideshow.photos.first else { return }
-        
-        let photoAsset = PhotoAsset(localIdentifier: firstPhoto.localIdentifier)
+
+        // Convert the saved localIdentifier into a PHAsset
+        let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: [firstPhoto.localIdentifier], options: nil)
+        guard let phAsset = fetchResult.firstObject else {
+            // The underlying photo may have been deleted from the library
+            return
+        }
+
+        let photoAsset = PhotoAsset(asset: phAsset)
         let size = CGSize(width: 600, height: 400) // Card thumbnail size
-        
+
         thumbnailImage = await photoService.thumbnail(for: photoAsset, size: size)
     }
 }

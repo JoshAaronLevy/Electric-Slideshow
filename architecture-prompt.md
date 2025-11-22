@@ -54,8 +54,6 @@ Please do the following:
 
 ## Goal 2: Normalize imports in these core files
 
-In a couple of files we currently have `internal import` syntax. I want to standardize imports to avoid access-level confusion.
-
 In the following files:
 
 * `Electric_SlideshowApp.swift`
@@ -65,12 +63,12 @@ In the following files:
 
 Please:
 
-1. Replace any `internal import SwiftUI` with:
+1. Replace any `import SwiftUI` with:
 
    ```swift
    import SwiftUI
    ```
-2. Replace any `internal import Photos` with:
+2. Replace any `import Photos` with:
 
    ```swift
    import Photos
