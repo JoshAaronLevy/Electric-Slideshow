@@ -6,7 +6,7 @@
 //
 
 import Foundation
-internal import Photos
+import Photos
 import Combine
 
 /// Simplified permission state for UI consumption
@@ -48,23 +48,6 @@ class PermissionViewModel: ObservableObject {
         
         let status = photoService.currentAuthorizationStatus()
         print("🔍 PermissionViewModel: Current authorization status after request: \(status.rawValue)")
-        
-        updateState(from: status)
-        print("🔍 PermissionViewModel: Final state after update: \(state)")
-    }
-    
-    /// Request Photos library authorization (synchronous version for direct user interaction)
-    func requestAuthorizationSync() async {
-        print("🔍 PermissionViewModel: requestAuthorizationSync() called")
-        print("🔍 PermissionViewModel: Current state before request: \(state)")
-        
-        // Use the synchronous version to preserve user interaction context
-        let status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
-        print("🔍 PermissionViewModel: PHPhotoLibrary.requestAuthorization() completed with status: \(status.rawValue)")
-        
-        // Update the service's authorization status
-        photoService.authorizationStatus = status
-        print("🔍 PermissionViewModel: Updated photoService authorization status")
         
         updateState(from: status)
         print("🔍 PermissionViewModel: Final state after update: \(state)")

@@ -5,7 +5,7 @@
 //  Created by Josh Levy on 11/20/25.
 //
 
-internal import SwiftUI
+import SwiftUI
 
 /// Root view that manages the permission flow and navigation
 struct AppShellView: View {
@@ -23,13 +23,8 @@ struct AppShellView: View {
                 PermissionNotificationBar(
                     state: permissionVM.state,
                     onRequestAccess: {
-                        print("🔍 AppShellView: Grant Access button tapped")
-                        print("🔍 AppShellView: Current permission state: \(permissionVM.state)")
-                        // Use Task to properly handle async call in non-async context
                         Task {
-                            print("🔍 AppShellView: Starting permission request")
-                            await permissionVM.requestAuthorizationSync()
-                            print("🔍 AppShellView: Permission request completed")
+                            await permissionVM.requestAuthorization()
                         }
                     },
                     onShowInstructions: {
