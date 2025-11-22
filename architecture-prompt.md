@@ -1,138 +1,88 @@
-I want you to STOP making code changes for this step and only analyze the existing project.
+I want you to make a very focused, minimal set of changes to clean up the photo permission flow and import statements.
+Do NOT do any large refactors, do NOT touch slideshow playback code, music/Spotify views, or anything unrelated to photo permissions.
+Only modify the following files:
 
-Project context:
+* `Electric_SlideshowApp.swift`
+* `AppShellView.swift`
+* `PermissionViewModel.swift`
+* `PhotoLibraryService.swift`
 
-* macOS SwiftUI app called **Electric Slideshow**.
-* Core features:
+---
 
-  * Photo permissions and access to the user’s Apple Photos library.
-  * Slideshow creation: select photos, set slideshow settings (duration, shuffle, repeat), optionally link a Spotify-backed playlist.
-  * Spotify integration via an existing Node/Express backend (deployed on Render) that handles OAuth, status, playlists, and playback.
-  * Slideshows view: show all saved slideshows (ideally grid); hover to reveal play button; clicking play starts a full-screen slideshow with music.
-  * Navigation: a top `AppNavigationBar` with sections for Slideshows, Music, Settings, and User.
+## Goal 1: Use a single, consistent photo authorization path
 
-### Problem
+Right now there are **two** ways to request Photos permission:
 
-We are experiencing a cycle of build errors. For instance, when I have either Roo Code or Copilot Chat attempt to fix the build errors, it fixes the existing ones, but then new ones appear, often in different files. This is leading to a frustrating "whack-a-mole" situation where fixing one error creates another. And then when we fix that one, we get the original errors back. We need to get this under control. We need to get the build stable so we can continue development.
+1. `PermissionViewModel.requestAuthorization()` → calls `photoService.requestAuthorization()`
+2. `PermissionViewModel.requestAuthorizationSync()` → calls `PHPhotoLibrary.requestAuthorization(for: .readWrite)` directly and then manually updates `photoService.authorizationStatus`.
 
-### Your task
+I want to **standardize on ONE path**:
 
-1. **Do NOT modify any existing source files or fix build errors in this step.**
-2. Instead, create a single new markdown file at:
+**All permission requests should go through `PhotoLibraryService.requestAuthorization()`**, and UI should call `PermissionViewModel.requestAuthorization()` only.
 
-   * `docs/electric-slideshow-architecture.md`
-3. In that file, write a clear, structured report that explains how the app is currently wired together.
+Please do the following:
 
-### Report structure
+1. In `PermissionViewModel.swift`:
 
-Please structure the markdown file with the following sections and fill them out based on the actual code in the repo:
+   * Remove (or fully comment out) the `requestAuthorizationSync()` method.
+   * Make sure there is **only one** method responsible for requesting permission:
+     `func requestAuthorization() async` which calls `photoService.requestAuthorization()`, then uses the returned status to update `state` via `updateState(from:)`.
+   * Do NOT call `PHPhotoLibrary.requestAuthorization` directly inside the view model anymore. All direct calls to `PHPhotoLibrary.requestAuthorization` should live only inside `PhotoLibraryService.requestAuthorization()`.
+2. In `AppShellView.swift`:
 
-#### 1. High-Level Overview
+   * In `PermissionNotificationBar`, the “Grant Access” button currently uses `permissionVM.requestAuthorizationSync()` via the closure passed as `onRequestAccess`.
+   * Change this so that when the user taps **Grant Access** in the notification bar, it uses the async `requestAuthorization()` method instead:
 
-* Briefly describe what the app does according to the current code, not just the intention.
-* List the main “layers” you see (e.g., Services, ViewModels, Views, Models).
+     ```swift
+     onRequestAccess: {
+         Task {
+             await permissionVM.requestAuthorization()
+         }
+     }
+     ```
+   * Make sure there are no remaining references to `requestAuthorizationSync()` anywhere in `AppShellView`.
+3. In `PhotoLibraryService.swift`:
 
-#### 2. App Entry Point & Global Services
+   * Leave `requestAuthorization()` as the **sole** place where `PHPhotoLibrary.requestAuthorization(for: .readWrite)` is called.
+   * Keep its logging and the `authorizationStatus` update, that’s fine. Just confirm that no other parts of the app directly mutate `authorizationStatus` except within this class.
+4. After this, there should be:
 
-* Identify the main app entry point (`Electric_SlideshowApp`).
-* Describe:
+   * No calls to `PHPhotoLibrary.requestAuthorization` outside of `PhotoLibraryService`.
+   * No remaining `requestAuthorizationSync()` method or references.
 
-  * Which shared services are created at app level (e.g., `PhotoLibraryService`, `SpotifyService`).
-  * How they are injected (`@StateObject`, `@EnvironmentObject`, etc.).
-* For each global service, note the file path and how it’s exposed to the rest of the app.
+---
 
-#### 3. Photo Permissions & Photo Library Flow
+## Goal 2: Normalize imports in these core files
 
-* List the types involved (e.g., `PhotoLibraryService`, `PermissionViewModel`, any views responsible for permission UI).
-* Describe:
+In a couple of files we currently have `internal import` syntax. I want to standardize imports to avoid access-level confusion.
 
-  * Where the app checks the Photos authorization status.
-  * Where `PHPhotoLibrary.requestAuthorization` is called.
-  * How the authorization state flows into the UI (state enums, view switching).
-* Include file paths for key types.
+In the following files:
 
-#### 4. Spotify / Music Integration
+* `Electric_SlideshowApp.swift`
+* `AppShellView.swift`
+* `PermissionViewModel.swift`
+* `PhotoLibraryService.swift`
 
-* Identify the service responsible for talking to the backend (e.g., `SpotifyService`).
-* For `SpotifyService`, document:
+Please:
 
-  * Which endpoints it calls (login URL, status, playlists, playback).
-  * Public methods exposed (e.g., `beginSpotifyLogin`, `refreshConnectionStatus`, `fetchPlaylists`, `createPlaylist`, `startPlayback`, `stopPlayback`).
-* Identify the `MusicViewModel` and `MusicView`:
+1. Replace any `internal import SwiftUI` with:
 
-  * How they use `SpotifyService`.
-  * How connection status and playlists are loaded and stored in state.
-* Note any TODOs or stubbed areas where playback is wired but not fully implemented.
+   ```swift
+   import SwiftUI
+   ```
+2. Replace any `internal import Photos` with:
 
-#### 5. Slideshow Domain Model & Persistence
+   ```swift
+   import Photos
+   ```
 
-* Describe the `Slideshow` model and any related models (`SlideshowPhoto`, `MusicPlaylist`, etc.).
-* List all properties of `Slideshow`, especially:
+Do not add any new frameworks or change other imports. Just normalize these to standard `import` statements.
 
-  * Title
-  * Photos
-  * Slide duration
-  * Shuffle / repeat flags
-  * Linked playlist ID
-* Describe how slideshows are stored and loaded:
+---
 
-  * Which type handles persistence (e.g., `SlideshowsStore`).
-  * Where that store lives and how it’s used by view models (file paths).
+## Constraints
 
-#### 6. Navigation & App Shell
-
-* Describe `AppShellView`, `AppMainView`, and `AppNavigationBar` (or their equivalents):
-
-  * How the current section is tracked (e.g., `AppSection` enum).
-  * How the top navigation bar is composed (app title left, section title center, icons right).
-  * How navigation between Slideshows / Music / Settings is handled.
-* Include file paths for each of these core views.
-
-#### 7. Slideshow Creation & Editing Flow
-
-* Identify the views and view models involved in:
-
-  * Creating a new slideshow.
-  * Selecting photos from the library.
-  * Setting title, slide duration, shuffle, repeat.
-  * Selecting a music playlist for the slideshow (if implemented).
-* Explain the flow step-by-step, with references to file paths, for example:
-
-  * “User clicks ‘New Slideshow’ in `SlideshowsListView` → opens `NewSlideshowFlowView` → which uses `PhotoSelectionView` and `SlideshowSettingsView` …”
-* Document how the final `Slideshow` object is constructed and persisted.
-
-#### 8. Slideshow Playback Flow (Full-Screen)
-
-* Identify the view(s) responsible for playback (e.g., `SlideshowPlaybackView`).
-* Explain:
-
-  * How the Slideshows view triggers playback (hover + play button → sets some `@State`).
-  * How full-screen is presented (`.fullScreenCover` or similar).
-  * How photos are loaded for playback (from `PhotoLibraryService` and `SlideshowPhoto`).
-  * How slide progression is handled (timers, async tasks, etc.).
-  * Where music playback is triggered and stopped using `SpotifyService`.
-* Note any places where the logic appears incomplete or inconsistent.
-
-#### 9. Potential Sources of Build Errors & Inconsistencies
-
-* Without changing any code, please list **specific issues you see that could cause build errors or whack-a-mole behavior**, for example:
-
-  * Duplicate type names in multiple files.
-  * Services or view models that are declared differently in multiple places.
-  * Incorrect or circular imports (e.g., importing SwiftUI in view models unnecessarily).
-  * Types referenced but not defined, or defined in the wrong module.
-  * Mismatched initializers (e.g., calling `PhotoLibraryService()` where the type signature doesn’t match).
-* For each issue, include:
-
-  * File path.
-  * Brief description of the problem.
-  * Suggested direction for fixing it later (but do NOT actually change any code now).
-
-### Very important constraints
-
-* **Do NOT modify any existing `.swift` files in this step.**
-* The ONLY change you’re allowed to make is to create or overwrite:
-
-  * `docs/electric-slideshow-architecture.md`
-* Focus on clarity and accuracy. This report is for a human (me) and another AI assistant (ChatGPT) to review and then decide on a clean-up strategy.
-* Try keeping the report concise but detailed enough to understand the current architecture and potential issues. If possible, try keep it under 500 lines of markdown.
+* Do NOT touch any slideshow-related models, view models, or views in this step.
+* Do NOT touch any Spotify-related services or views in this step.
+* Do NOT introduce new files.
+* Keep logging as-is unless it blocks compilation.
