@@ -255,8 +255,8 @@ private struct PhotoThumbnailView: View {
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
                     .strokeBorder(
-                        isSelected ? Color.accentColor : (isHovered ? Color.secondary.opacity(0.3) : Color.clear),
-                        lineWidth: isSelected ? 3 : 1
+                        isSelected ? Color.accentColor : (isHovered ? Color.accentColor.opacity(0.6) : Color.clear),
+                        lineWidth: isSelected ? 3 : 2
                     )
             )
             .shadow(color: .black.opacity(isSelected ? 0.2 : 0.1), radius: isSelected ? 4 : 2, y: 1)
@@ -274,16 +274,13 @@ private struct PhotoThumbnailView: View {
                     .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
                     .padding(6)
             }
-            
-            // Hover overlay
-            if isHovered && !isSelected {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.accentColor.opacity(0.1))
-            }
         }
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
-                isHovered = hovering
+            isHovered = hovering
+            if hovering {
+                NSCursor.pointingHand.push()
+            } else {
+                NSCursor.pop()
             }
         }
         .animation(.easeInOut(duration: 0.2), value: isSelected)

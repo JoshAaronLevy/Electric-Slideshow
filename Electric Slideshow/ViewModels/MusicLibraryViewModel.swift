@@ -6,8 +6,10 @@ import Combine
 final class MusicLibraryViewModel: ObservableObject {
     @Published var spotifyPlaylists: [SpotifyPlaylist] = []
     @Published var savedTracks: [SpotifyTrack] = []
+    @Published var currentPlaylistTracks: [SpotifyTrack] = []
     @Published var selectedTrackURIs: Set<String> = []
     @Published var isLoading = false
+    @Published var isLoadingPlaylistTracks = false
     @Published var errorMessage: String?
     
     private let apiService: SpotifyAPIService
@@ -64,5 +66,20 @@ final class MusicLibraryViewModel: ObservableObject {
     
     func clearSelection() {
         selectedTrackURIs.removeAll()
+    }
+    
+    func loadPlaylistTracks(playlistId: String) async {
+        isLoadingPlaylistTracks = true
+        print("[MusicLibraryVM] Loading tracks for playlist: \(playlistId)")
+        
+        do {
+            currentPlaylistTracks = try await apiService.fetchPlaylistTracks(playlistId: playlistId)
+            print("[MusicLibraryVM] Loaded \(currentPlaylistTracks.count) tracks from playlist")
+            isLoadingPlaylistTracks = false
+        } catch {
+            print("[MusicLibraryVM] ERROR loading playlist tracks: \(error)")
+            errorMessage = "Failed to load playlist tracks: \(error.localizedDescription)"
+            isLoadingPlaylistTracks = false
+        }
     }
 }

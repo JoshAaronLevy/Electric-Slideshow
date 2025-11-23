@@ -102,6 +102,7 @@ struct PhotoGridView: View {
 private struct PhotoThumbnailView: View {
     let photo: PhotoAsset
     let thumbnail: NSImage?
+    @State private var isHovered = false
     
     var body: some View {
         Group {
@@ -124,7 +125,19 @@ private struct PhotoThumbnailView: View {
                     }
             }
         }
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(isHovered ? Color.accentColor.opacity(0.6) : Color.clear, lineWidth: 2)
+        )
         .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
         .animation(.easeInOut(duration: 0.2), value: thumbnail != nil)
+        .onHover { hovering in
+            isHovered = hovering
+            if hovering {
+                NSCursor.pointingHand.push()
+            } else {
+                NSCursor.pop()
+            }
+        }
     }
 }
