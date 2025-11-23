@@ -24,6 +24,14 @@ struct PlaylistsView: View {
                     notConnectedView
                 }
             }
+            .sheet(isPresented: $showingNewPlaylistFlow) {
+                NewPlaylistFlowView(
+                    spotifyAPIService: apiService,
+                    playlistsStore: playlistsStore
+                ) { playlist in
+                    playlistsStore.addPlaylist(playlist)
+                }
+            }
         }
     }
     
@@ -39,14 +47,6 @@ struct PlaylistsView: View {
         .navigationTitle("Playlists")
         .overlay(alignment: .bottomTrailing) {
             floatingActionButton
-        }
-        .sheet(isPresented: $showingNewPlaylistFlow) {
-            NewPlaylistFlowView(
-                spotifyAPIService: apiService,
-                playlistsStore: playlistsStore
-            ) { playlist in
-                playlistsStore.addPlaylist(playlist)
-            }
         }
     }
     
