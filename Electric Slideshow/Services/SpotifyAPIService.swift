@@ -317,4 +317,3 @@ struct SpotifyDevice: Decodable, Identifiable {
 
     var deviceId: String { device_id ?? id }
 }
-}
