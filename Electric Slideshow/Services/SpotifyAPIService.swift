@@ -139,6 +139,32 @@ final class SpotifyAPIService: ObservableObject {
     }
     
     // MARK: - Playback
+
+    // MARK: - Devices
+
+    /// Fetches available Spotify devices for playback
+    func fetchAvailableDevices() async throws -> [SpotifyDevice] {
+        let url = baseURL.appendingPathComponent("me/player/devices")
+        let token = try await authService.getValidAccessToken()
+
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.requestFailed(statusCode: 0, message: "Invalid response")
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let errorBody = String(data: data, encoding: .utf8) ?? "(no body)"
+            print("[SpotifyAPI] ERROR: Devices request failed with \(httpResponse.statusCode): \(errorBody)")
+            throw APIError.requestFailed(statusCode: httpResponse.statusCode, message: errorBody)
+        }
+
+        let devicesResponse = try JSONDecoder().decode(SpotifyDevicesResponse.self, from: data)
+        return devicesResponse.devices
+    }
     
     func startPlayback(trackURIs: [String], deviceId: String? = nil) async throws {
         let url = baseURL.appendingPathComponent("me/player/play")
@@ -270,4 +296,25 @@ final class SpotifyAPIService: ObservableObject {
             }
         }
     }
+}
+
+// MARK: - Device Models
+
+struct SpotifyDevicesResponse: Decodable {
+    let devices: [SpotifyDevice]
+}
+
+struct SpotifyDevice: Decodable, Identifiable {
+    let id: String
+    let name: String
+    let type: String
+    let is_active: Bool
+    let is_restricted: Bool
+    let volume_percent: Int?
+    let is_private_session: Bool?
+    let is_group: Bool?
+    let device_id: String?
+
+    var deviceId: String { device_id ?? id }
+}
 }

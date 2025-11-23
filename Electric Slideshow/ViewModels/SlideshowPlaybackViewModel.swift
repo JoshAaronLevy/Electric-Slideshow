@@ -186,20 +186,32 @@ final class SlideshowPlaybackViewModel: ObservableObject {
             // No music configured or Spotify not available
             return
         }
-        
+
         // Find the app playlist
         guard let playlist = playlistsStore.playlists.first(where: { $0.id == playlistId }) else {
             errorMessage = "Playlist not found"
             return
         }
-        
+
         guard !playlist.trackURIs.isEmpty else {
             errorMessage = "Playlist is empty"
             return
         }
-        
+
         do {
-            try await apiService.startPlayback(trackURIs: playlist.trackURIs)
+            // Fetch available devices
+            let devices = try await apiService.fetchAvailableDevices()
+            // Prefer active device, fallback to device of type "Computer" (Mac)
+            let activeDevice = devices.first(where: { $0.is_active })
+                ?? devices.first(where: { $0.type.lowercased() == "computer" })
+
+            guard let device = activeDevice else {
+                showingMusicError = true
+                errorMessage = "No active Spotify device found. Please open Spotify on your Mac and start playback manually."
+                return
+            }
+
+            try await apiService.startPlayback(trackURIs: playlist.trackURIs, deviceId: device.deviceId)
         } catch {
             showingMusicError = true
             errorMessage = "Failed to start music playback. Make sure Spotify is open on this device."
