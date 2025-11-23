@@ -265,20 +265,20 @@
 				INFOPLIST_KEY_CFBundleURLTypes = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\"><plist version=\"1.0\"><array><dict><key>CFBundleTypeRole</key><string>Editor</string><key>CFBundleURLName</key><string>com.electricslideshow</string><key>CFBundleURLSchemes</key><array><string>com.electricslideshow</string></array></dict></array></plist>";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.photography";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Electric Slideshow may add images to your library when exporting slideshows.";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Electric Slideshow needs access to your Photos library to create and display custom slideshows.";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "joshlevy.Electric-Slideshow";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				REGISTER_APP_GROUPS = YES;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
+			INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Electric Slideshow may add images to your library when exporting slideshows.";
+			INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Electric Slideshow needs access to your Photos library to create and display custom slideshows.";
+			LD_RUNPATH_SEARCH_PATHS = (
+				"$(inherited)",
+				"@executable_path/../Frameworks",
+			);
+			MARKETING_VERSION = 1.1;
+			PRODUCT_BUNDLE_IDENTIFIER = "joshlevy.Electric-Slideshow";
+			PRODUCT_NAME = "$(TARGET_NAME)";
+			REGISTER_APP_GROUPS = YES;
+			STRING_CATALOG_GENERATE_SYMBOLS = YES;
+			SWIFT_APPROACHABLE_CONCURRENCY = YES;
+			SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+			SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 			};

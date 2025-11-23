@@ -19,11 +19,12 @@ struct SlideshowsListView: View {
     @State private var activeSlideshowForPlayback: Slideshow?
     @StateObject private var spotifyAPIService: SpotifyAPIService
     
-    // 3-column grid layout
+    // 4-column grid layout
     private let columns = [
-        GridItem(.flexible(), spacing: 20),
-        GridItem(.flexible(), spacing: 20),
-        GridItem(.flexible(), spacing: 20)
+        GridItem(.flexible(), spacing: 16),
+        GridItem(.flexible(), spacing: 16),
+        GridItem(.flexible(), spacing: 16),
+        GridItem(.flexible(), spacing: 16)
     ]
     
     init() {
@@ -108,7 +109,7 @@ struct SlideshowsListView: View {
     
     private var slideshowsGrid: some View {
         ScrollView {
-            LazyVGrid(columns: columns, spacing: 20) {
+            LazyVGrid(columns: columns, spacing: 16) {
                 ForEach(viewModel.slideshows) { slideshow in
                     SlideshowCardView(
                         slideshow: slideshow,
@@ -124,7 +125,7 @@ struct SlideshowsListView: View {
                     )
                 }
             }
-            .padding()
+            .padding(24)
         }
     }
 }

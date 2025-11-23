@@ -26,19 +26,24 @@ struct SlideshowPlaybackView: View {
     
     var body: some View {
         ZStack {
-            // Background
-            Color.black.ignoresSafeArea()
+            // Full-screen black background
+            Color.black
+                .ignoresSafeArea(edges: .all)
             
             // Current slide image
             if viewModel.isLoading {
                 ProgressView("Loading images...")
                     .foregroundStyle(.white)
             } else if let image = viewModel.currentImage {
-                Image(nsImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .id(viewModel.currentIndex) // Force view update
-                    .transition(.opacity)
+                GeometryReader { geometry in
+                    Image(nsImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .id(viewModel.currentIndex) // Force view update
+                        .transition(.opacity)
+                }
+                .ignoresSafeArea(edges: .all)
             }
             
             // Controls overlay
