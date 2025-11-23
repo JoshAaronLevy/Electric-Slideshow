@@ -7,15 +7,15 @@
 
 import SwiftUI
 
-/// Placeholder view for the Music section
-struct MusicPlaceholderView: View {
+/// Placeholder view for the Playlists section
+struct PlaylistsPlaceholderView: View {
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: "music.note")
                 .font(.system(size: 72))
                 .foregroundStyle(.secondary)
             
-            Text("Music view loaded!")
+            Text("Playlists view loaded!")
                 .font(.title2)
                 .foregroundStyle(.secondary)
             
@@ -67,8 +67,8 @@ struct UserPlaceholderView: View {
     }
 }
 
-#Preview("Music") {
-    MusicPlaceholderView()
+#Preview("Playlists") {
+    PlaylistsPlaceholderView()
 }
 
 #Preview("Settings") {

@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// View for displaying Spotify connection and managing app playlists
-struct MusicView: View {
+struct PlaylistsView: View {
     @EnvironmentObject private var spotifyAuthService: SpotifyAuthService
     @EnvironmentObject private var playlistsStore: PlaylistsStore
     @StateObject private var apiService: SpotifyAPIService
@@ -41,18 +41,18 @@ struct MusicView: View {
                     }
                 }
             }
-            .navigationTitle("Music")
-            .toolbar {
-                ToolbarItem(placement: .status) {
-                    HStack {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                        Text("Connected to Spotify")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
+            .navigationTitle("Playlists")
+            // .toolbar {
+            //     ToolbarItem(placement: .status) {
+            //         HStack {
+            //             Image(systemName: "checkmark.circle.fill")
+            //                 .foregroundStyle(.green)
+            //             Text("Connected to Spotify")
+            //                 .font(.caption)
+            //                 .foregroundStyle(.secondary)
+            //         }
+            //     }
+            // }
             .overlay(alignment: .bottomTrailing) {
                 floatingActionButton
             }
@@ -156,7 +156,7 @@ struct PlaylistRow: View {
 
 #Preview {
     NavigationStack {
-        MusicView()
+        PlaylistsView()
             .environmentObject(SpotifyAuthService.shared)
             .environmentObject(PlaylistsStore())
     }

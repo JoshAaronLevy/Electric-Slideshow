@@ -35,7 +35,7 @@ struct AppMainView: View {
                 case .slideshows:
                     SlideshowsListView()
                 case .music:
-                    MusicView()
+                    PlaylistsView()
                 case .settings:
                     SettingsPlaceholderView()
                 case .user:
