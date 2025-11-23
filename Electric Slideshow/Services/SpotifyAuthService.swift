@@ -15,6 +15,9 @@ final class SpotifyAuthService: ObservableObject {
     private var codeVerifier: String?
     private let keychainKey = "spotifyAuthToken"
     
+    // Token refresh synchronization
+    private var refreshTask: Task<String, Error>?
+    
     private init() {
         // All properties are now initialized with default values
         // Safe to call method that accesses properties
@@ -123,7 +126,25 @@ final class SpotifyAuthService: ObservableObject {
         if expiryThreshold >= token.expiryDate {
             // Token is expired or about to expire, refresh it
             print("[SpotifyAuth] Token is expired or expiring soon, refreshing...")
-            return try await refreshAccessToken(refreshToken: token.refreshToken)
+            
+            // Check if a refresh is already in progress
+            if let existingTask = refreshTask {
+                print("[SpotifyAuth] Refresh already in progress, waiting for existing task...")
+                return try await existingTask.value
+            }
+            
+            // Create a new refresh task
+            print("[SpotifyAuth] Starting new refresh task...")
+            let task = Task<String, Error> {
+                defer {
+                    print("[SpotifyAuth] Clearing refresh task")
+                    self.refreshTask = nil
+                }
+                return try await self.refreshAccessToken(refreshToken: token.refreshToken)
+            }
+            
+            refreshTask = task
+            return try await task.value
         }
         
         print("[SpotifyAuth] Token is valid, returning access token")
