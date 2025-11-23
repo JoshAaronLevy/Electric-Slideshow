@@ -30,6 +30,9 @@ struct NewPlaylistFlowView: View {
                 }
             }
             .navigationTitle(currentStep.title)
+            .task {
+                await musicLibraryVM.loadLibrary()
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

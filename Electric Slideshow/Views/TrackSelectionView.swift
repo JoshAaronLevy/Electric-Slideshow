@@ -48,9 +48,6 @@ struct TrackSelectionView: View {
                 }
             }
         }
-        .task {
-            await viewModel.loadLibrary()
-        }
     }
 }
 
