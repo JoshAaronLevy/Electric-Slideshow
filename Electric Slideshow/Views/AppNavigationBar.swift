@@ -19,9 +19,18 @@ struct AppNavigationBar: View {
     
     var body: some View {
         HStack(spacing: 0) {
-            // Left: Stacked app name
-            appTitleView
-                .frame(minWidth: 100, alignment: .leading)
+            // Left: App logo and stacked app name
+            HStack(spacing: 8) {
+                // App logo
+                Image("AppLogo")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 32, height: 32)
+                
+                // Stacked app name
+                appTitleView
+            }
+            .frame(minWidth: 100, alignment: .leading)
             
             Spacer(minLength: 20)
             

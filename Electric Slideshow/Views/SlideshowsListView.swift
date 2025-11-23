@@ -41,9 +41,6 @@ struct SlideshowsListView: View {
                 }
             }
             .navigationTitle("Slideshows")
-            .overlay(alignment: .bottomTrailing) {
-                floatingActionButton
-            }
             .sheet(isPresented: $showingNewSlideshowFlow) {
                 NewSlideshowFlowView(photoService: photoService) { slideshow in
                     viewModel.addSlideshow(slideshow)
@@ -140,6 +137,9 @@ struct SlideshowsListView: View {
                 }
             }
             .padding(24)
+            .overlay(alignment: .bottomTrailing) {
+                floatingActionButton
+            }
         }
     }
 }
