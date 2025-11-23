@@ -20,11 +20,18 @@ struct Electric_SlideshowApp: App {
                 .environmentObject(spotifyAuthService)
                 .environmentObject(playlistsStore)
                 .onOpenURL { url in
+                    print("[App] ===== onOpenURL CALLED =====")
+                    print("[App] URL: \(url.absoluteString)")
+                    print("[App] Scheme: \(url.scheme ?? "nil")")
+                    
                     // Handle OAuth callback
                     if url.scheme == "com.electricslideshow" {
+                        print("[App] Scheme matches, calling handleCallback")
                         Task {
                             await spotifyAuthService.handleCallback(url: url)
                         }
+                    } else {
+                        print("[App] Scheme does not match com.electricslideshow")
                     }
                 }
         }

@@ -25,12 +25,16 @@ final class SpotifyAuthService: ObservableObject {
     
     /// Initiates the OAuth authentication flow by opening Spotify's authorization URL
     func beginAuthentication() {
+        print("[SpotifyAuth] ===== BEGIN AUTHENTICATION =====")
+        print("[SpotifyAuth] Current auth status: \(isAuthenticated)")
+        
         // Generate PKCE codes
         let verifier = PKCEHelper.generateCodeVerifier()
         let challenge = PKCEHelper.generateCodeChallenge(from: verifier)
         
         // Store verifier for later use in callback
         self.codeVerifier = verifier
+        print("[SpotifyAuth] Generated code verifier and challenge")
         
         // Build authorization URL
         var components = URLComponents(string: SpotifyConfig.spotifyAuthURL.absoluteString)!
@@ -45,11 +49,15 @@ final class SpotifyAuthService: ObservableObject {
         
         guard let url = components.url else {
             authError = "Failed to construct authorization URL"
+            print("[SpotifyAuth] ERROR: Failed to construct authorization URL")
             return
         }
         
+        print("[SpotifyAuth] Opening Spotify authorization URL: \(url.absoluteString)")
+        
         // Open in browser
-        NSWorkspace.shared.open(url)
+        let opened = NSWorkspace.shared.open(url)
+        print("[SpotifyAuth] Browser opened: \(opened)")
     }
     
     /// Handles the OAuth callback with authorization code
@@ -91,9 +99,14 @@ final class SpotifyAuthService: ObservableObject {
     
     /// Returns a valid access token, refreshing if necessary
     func getValidAccessToken() async throws -> String {
+        print("[SpotifyAuth] getValidAccessToken() called")
+        
         guard let token = try KeychainService.shared.retrieve(SpotifyAuthToken.self, forKey: keychainKey) else {
+            print("[SpotifyAuth] ERROR: No token found in keychain - throwing notAuthenticated")
             throw SpotifyAuthError.notAuthenticated
         }
+        
+        print("[SpotifyAuth] Token found in keychain, checking expiry...")
         
         // Check if token is expired (with 5 minute buffer)
         let bufferTime: TimeInterval = 300 // 5 minutes
@@ -121,8 +134,10 @@ final class SpotifyAuthService: ObservableObject {
         do {
             let token = try KeychainService.shared.retrieve(SpotifyAuthToken.self, forKey: keychainKey)
             isAuthenticated = token != nil
+            print("[SpotifyAuth] Checked auth status in init: \(isAuthenticated ? "authenticated (token found)" : "not authenticated (no token)")")
         } catch {
             isAuthenticated = false
+            print("[SpotifyAuth] Checked auth status in init: not authenticated (error: \(error))")
         }
     }
     
