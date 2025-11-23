@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// View for displaying Spotify connection and managing app playlists
-struct MusicView: View {
+struct PlaylistsView: View {
     @EnvironmentObject private var spotifyAuthService: SpotifyAuthService
     @EnvironmentObject private var playlistsStore: PlaylistsStore
     @StateObject private var apiService: SpotifyAPIService
@@ -12,57 +12,40 @@ struct MusicView: View {
     }
     
     var body: some View {
-        Group {
-            if spotifyAuthService.isAuthenticated {
-                playlistsView
-            } else {
-                notConnectedView
+        NavigationStack {
+            Group {
+                if spotifyAuthService.isAuthenticated {
+                    if playlistsStore.playlists.isEmpty {
+                        emptyStateView
+                    } else {
+                        playlistsView
+                    }
+                } else {
+                    notConnectedView
+                }
             }
         }
     }
     
     private var playlistsView: some View {
-        NavigationStack {
-            List {
-                Section("App Playlists") {
-                    if playlistsStore.playlists.isEmpty {
-                        ContentUnavailableView(
-                            "No Playlists Yet",
-                            systemImage: "music.note.list",
-                            description: Text("Create a playlist from your Spotify library to add music to your slideshows")
-                        )
-                    } else {
-                        ForEach(playlistsStore.playlists) { playlist in
-                            PlaylistRow(playlist: playlist)
-                        }
-                        .onDelete { offsets in
-                            playlistsStore.deletePlaylist(at: offsets)
-                        }
-                    }
-                }
+        List {
+            ForEach(playlistsStore.playlists) { playlist in
+                PlaylistRow(playlist: playlist)
             }
-            .navigationTitle("Music")
-            .toolbar {
-                ToolbarItem(placement: .status) {
-                    HStack {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                        Text("Connected to Spotify")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
+            .onDelete { offsets in
+                playlistsStore.deletePlaylist(at: offsets)
             }
-            .overlay(alignment: .bottomTrailing) {
-                floatingActionButton
-            }
-            .sheet(isPresented: $showingNewPlaylistFlow) {
-                NewPlaylistFlowView(
-                    spotifyAPIService: apiService,
-                    playlistsStore: playlistsStore
-                ) { playlist in
-                    playlistsStore.addPlaylist(playlist)
-                }
+        }
+        .navigationTitle("Playlists")
+        .overlay(alignment: .bottomTrailing) {
+            floatingActionButton
+        }
+        .sheet(isPresented: $showingNewPlaylistFlow) {
+            NewPlaylistFlowView(
+                spotifyAPIService: apiService,
+                playlistsStore: playlistsStore
+            ) { playlist in
+                playlistsStore.addPlaylist(playlist)
             }
         }
     }
@@ -129,6 +112,24 @@ struct MusicView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+
+    // MARK: - Empty State
+    
+    private var emptyStateView: some View {
+        ContentUnavailableView {
+            Label("No Playlists Yet", systemImage: "music.note.list")
+        } description: {
+            Text("Create a playlist to add music to your slideshows")
+        } actions: {
+            Button {
+                showingNewPlaylistFlow = true
+            } label: {
+                Text("Create Playlist")
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Color.appBlue)
+        }
+    }
 }
 
 struct PlaylistRow: View {
@@ -155,9 +156,7 @@ struct PlaylistRow: View {
 }
 
 #Preview {
-    NavigationStack {
-        MusicView()
-            .environmentObject(SpotifyAuthService.shared)
-            .environmentObject(PlaylistsStore())
-    }
+    PlaylistsView()
+        .environmentObject(SpotifyAuthService.shared)
+        .environmentObject(PlaylistsStore())
 }

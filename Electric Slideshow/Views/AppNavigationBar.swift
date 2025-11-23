@@ -19,9 +19,18 @@ struct AppNavigationBar: View {
     
     var body: some View {
         HStack(spacing: 0) {
-            // Left: Stacked app name
-            appTitleView
-                .frame(minWidth: 100, alignment: .leading)
+            // Left: App logo and stacked app name
+            HStack(spacing: 8) {
+                // App logo
+                Image("AppLogo")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 32, height: 32)
+                
+                // Stacked app name
+                appTitleView
+            }
+            .frame(minWidth: 100, alignment: .leading)
             
             Spacer(minLength: 20)
             
@@ -118,12 +127,12 @@ struct AppNavigationBar: View {
     .frame(width: 800, height: 600)
 }
 
-#Preview("Music Selected") {
+#Preview("Playlists Selected") {
     VStack(spacing: 0) {
         AppNavigationBar(
             appTitleTop: "Electric",
             appTitleBottom: "Slideshow",
-            currentSectionTitle: "Music",
+            currentSectionTitle: "Playlists",
             sections: [.slideshows, .music, .settings, .user],
             selectedSection: .music,
             onSectionSelected: { _ in },
@@ -172,7 +181,7 @@ struct AppNavigationBar: View {
         AppNavigationBar(
             appTitleTop: "Electric",
             appTitleBottom: "Slideshow",
-            currentSectionTitle: "Music",
+            currentSectionTitle: "Playlists",
             sections: [.slideshows, .music, .settings, .user],
             selectedSection: .music,
             onSectionSelected: { _ in },

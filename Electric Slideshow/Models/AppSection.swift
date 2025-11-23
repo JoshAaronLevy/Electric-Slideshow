@@ -19,7 +19,7 @@ enum AppSection: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .slideshows: return "Slideshows"
-        case .music: return "Music"
+        case .music: return "Playlists"
         case .settings: return "Settings"
         case .user: return "User"
         }
