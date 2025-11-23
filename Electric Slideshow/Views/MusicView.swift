@@ -43,14 +43,6 @@ struct MusicView: View {
             }
             .navigationTitle("Music")
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showingNewPlaylistFlow = true
-                    } label: {
-                        Label("New Playlist", systemImage: "plus")
-                    }
-                }
-                
                 ToolbarItem(placement: .status) {
                     HStack {
                         Image(systemName: "checkmark.circle.fill")
@@ -60,6 +52,9 @@ struct MusicView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+            }
+            .overlay(alignment: .bottomTrailing) {
+                floatingActionButton
             }
             .sheet(isPresented: $showingNewPlaylistFlow) {
                 NewPlaylistFlowView(
@@ -72,40 +67,66 @@ struct MusicView: View {
         }
     }
     
-    private var notConnectedView: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "music.note")
-                .font(.system(size: 60))
-                .foregroundStyle(.secondary)
-            
-            Text("Connect Spotify")
-                .font(.title)
-            
-            Text("Connect your Spotify account to create playlists for your slideshows")
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal)
-            
-            Button("Connect with Spotify") {
-                spotifyAuthService.beginAuthentication()
-            }
-            .buttonStyle(.borderedProminent)
-            
-            if let error = spotifyAuthService.authError {
-                HStack {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.orange)
-                    
-                    Text(error)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                .padding()
-                .background(Color.orange.opacity(0.1))
-                .cornerRadius(8)
-            }
+    // MARK: - Floating Action Button
+    
+    private var floatingActionButton: some View {
+        Button {
+            showingNewPlaylistFlow = true
+        } label: {
+            Image(systemName: "plus")
+                .font(.title2)
+                .fontWeight(.semibold)
+                .foregroundStyle(.white)
+                .frame(width: 60, height: 60)
+                .background(Color.appBlue)
+                .clipShape(Circle())
+                .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
         }
-        .padding()
+        .buttonStyle(.plain)
+        .padding(24)
+    }
+    
+    private var notConnectedView: some View {
+        VStack {
+            Spacer()
+            
+            VStack(spacing: 20) {
+                Image(systemName: "music.note")
+                    .font(.system(size: 60))
+                    .foregroundStyle(.secondary)
+                
+                Text("Connect Spotify")
+                    .font(.title)
+                
+                Text("Connect your Spotify account to create playlists for your slideshows")
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal)
+                
+                Button("Connect with Spotify") {
+                    spotifyAuthService.beginAuthentication()
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Color.appBlue)
+                
+                if let error = spotifyAuthService.authError {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.orange)
+                        
+                        Text(error)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding()
+                    .background(Color.orange.opacity(0.1))
+                    .cornerRadius(8)
+                }
+            }
+            .padding()
+            
+            Spacer()
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

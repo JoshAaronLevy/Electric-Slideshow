@@ -41,15 +41,8 @@ struct SlideshowsListView: View {
                 }
             }
             .navigationTitle("Slideshows")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showingNewSlideshowFlow = true
-                    } label: {
-                        Label("New Slideshow", systemImage: "plus")
-                    }
-                    .keyboardShortcut("n", modifiers: .command)
-                }
+            .overlay(alignment: .bottomTrailing) {
+                floatingActionButton
             }
             .sheet(isPresented: $showingNewSlideshowFlow) {
                 NewSlideshowFlowView(photoService: photoService) { slideshow in
@@ -102,7 +95,28 @@ struct SlideshowsListView: View {
                 Text("Create Slideshow")
             }
             .buttonStyle(.borderedProminent)
+            .tint(Color.appBlue)
         }
+    }
+    
+    // MARK: - Floating Action Button
+    
+    private var floatingActionButton: some View {
+        Button {
+            showingNewSlideshowFlow = true
+        } label: {
+            Image(systemName: "plus")
+                .font(.title2)
+                .fontWeight(.semibold)
+                .foregroundStyle(.white)
+                .frame(width: 60, height: 60)
+                .background(Color.appBlue)
+                .clipShape(Circle())
+                .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
+        }
+        .buttonStyle(.plain)
+        .keyboardShortcut("n", modifiers: .command)
+        .padding(24)
     }
     
     // MARK: - Grid View
