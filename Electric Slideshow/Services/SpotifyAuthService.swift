@@ -107,14 +107,26 @@ final class SpotifyAuthService: ObservableObject {
         }
         
         print("[SpotifyAuth] Token found in keychain, checking expiry...")
+        print("[SpotifyAuth] Token issued at: \(token.issuedAt)")
+        print("[SpotifyAuth] Token expires at: \(token.expiryDate)")
+        print("[SpotifyAuth] Current time: \(Date())")
+        print("[SpotifyAuth] Token expiresIn: \(token.expiresIn) seconds")
         
         // Check if token is expired (with 5 minute buffer)
         let bufferTime: TimeInterval = 300 // 5 minutes
-        if Date().addingTimeInterval(bufferTime) >= token.expiryDate {
+        let now = Date()
+        let expiryThreshold = now.addingTimeInterval(bufferTime)
+        
+        print("[SpotifyAuth] Expiry threshold (now + 5min): \(expiryThreshold)")
+        print("[SpotifyAuth] Is expired? \(expiryThreshold >= token.expiryDate)")
+        
+        if expiryThreshold >= token.expiryDate {
             // Token is expired or about to expire, refresh it
+            print("[SpotifyAuth] Token is expired or expiring soon, refreshing...")
             return try await refreshAccessToken(refreshToken: token.refreshToken)
         }
         
+        print("[SpotifyAuth] Token is valid, returning access token")
         return token.accessToken
     }
     
