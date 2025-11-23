@@ -6,10 +6,14 @@ You are helping debug Spotify integration in a macOS SwiftUI app called Electric
 
 [MusicLibraryVM] Starting to load Spotify library...
 [SpotifyAPI] Fetching user playlists from: https://api.spotify.com/v1/me/playlists
+[SpotifyAuth] getValidAccessToken() called
+[SpotifyAuth] Token found in keychain, checking expiry...
 [SpotifyAPI] Fetching saved tracks from: https://api.spotify.com/v1/me/tracks?limit=50&offset=0
+[SpotifyAuth] getValidAccessToken() called
+[SpotifyAuth] Token found in keychain, checking expiry...
 [MusicLibraryVM] ERROR: Error Domain=NSURLErrorDomain Code=-999 "cancelled" UserInfo={NSErrorFailingURLStringKey=https://api.spotify.com/v1/me/playlists, NSErrorFailingURLKey=https://api.spotify.com/v1/me/playlists, _NSURLErrorRelatedURLSessionTaskErrorKey=(
-    "LocalDataTask <8D598F83-9348-4F39-968F-A9A5F99DDFC9>.<1>"
-), _NSURLErrorFailingURLSessionTaskErrorKey=LocalDataTask <8D598F83-9348-4F39-968F-A9A5F99DDFC9>.<1>, NSLocalizedDescription=cancelled}
+    "LocalDataTask <4F091D16-DEF9-471D-A9A0-3521AF468E94>.<1>"
+), _NSURLErrorFailingURLSessionTaskErrorKey=LocalDataTask <4F091D16-DEF9-471D-A9A0-3521AF468E94>.<1>, NSLocalizedDescription=cancelled}
 
 The app uses a Node/Express backend for Spotify OAuth PKCE and Web API calls.
 
