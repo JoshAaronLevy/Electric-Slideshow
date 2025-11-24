@@ -4,6 +4,11 @@ struct SettingsDashboardView: View {
     @State private var showingDevicesSheet = false
     @StateObject private var spotifyAPIService = SpotifyAPIService(authService: SpotifyAuthService.shared)
     @StateObject private var devicesViewModel: SpotifyDevicesViewModel
+    
+    init(devicesViewModel: SpotifyDevicesViewModel) {
+        self._devicesViewModel = StateObject(wrappedValue: devicesViewModel)
+    }
+    
     private let tiles: [SettingsTile] = [
         SettingsTile(
             title: "Playback Devices",
@@ -43,8 +48,10 @@ struct SettingsDashboardView: View {
     }
     
     private func handleTileAction(_ action: SettingsTile.Action) {
+        print("[SettingsDashboardView] handleTileAction called with: \(action)")
         switch action {
         case .playbackDevices:
+            print("[SettingsDashboardView] Setting showingDevicesSheet = true")
             showingDevicesSheet = true
         }
     }
@@ -167,5 +174,5 @@ private struct SpotifyDevicesSheet: View {
 }
 
 #Preview {
-    SettingsDashboardView()
+    SettingsDashboardView(devicesViewModel: SpotifyDevicesViewModel())
 }

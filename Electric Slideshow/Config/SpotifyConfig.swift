@@ -18,7 +18,8 @@ struct SpotifyConfig {
         "playlist-read-collaborative",
         "user-library-read",
         "user-read-playback-state",
-        "user-modify-playback-state"
+        "user-modify-playback-state",
+        "user-read-playback-position"
     ]
     
     static let spotifyAuthURL = URL(string: "https://accounts.spotify.com/authorize")!

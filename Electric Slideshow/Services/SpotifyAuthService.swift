@@ -176,7 +176,9 @@ final class SpotifyAuthService: ObservableObject {
     
     private func exchangeCodeForToken(code: String, codeVerifier: String) async throws {
         let url = SpotifyConfig.tokenExchangeURL
+        print("[SpotifyAuth] ===== TOKEN EXCHANGE STARTED =====")
         print("[SpotifyAuth] Exchanging code for token at: \(url.absoluteString)")
+        print("[SpotifyAuth] Requested scopes: '\(SpotifyConfig.scopes.joined(separator: " "))'")
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -188,6 +190,7 @@ final class SpotifyAuthService: ObservableObject {
             "redirect_uri": SpotifyConfig.redirectURI
         ]
         
+        print("[SpotifyAuth] Exchange request body: \(body)")
         request.httpBody = try JSONEncoder().encode(body)
         
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -206,8 +209,25 @@ final class SpotifyAuthService: ObservableObject {
         }
         
         let token = try JSONDecoder().decode(SpotifyAuthToken.self, from: data)
+        print("[SpotifyAuth] Token exchange successful")
+        print("[SpotifyAuth] Received scopes: '\(token.scope)'")
+        print("[SpotifyAuth] Token expires in: \(token.expiresIn) seconds")
+        
+        // Validate that received scopes match requested scopes
+        let requestedScopes = SpotifyConfig.scopes.joined(separator: " ")
+        if token.scope != requestedScopes {
+            print("[SpotifyAuth] WARNING: Scope mismatch detected!")
+            print("[SpotifyAuth] Requested: '\(requestedScopes)'")
+            print("[SpotifyAuth] Received: '\(token.scope)'")
+            print("[SpotifyAuth] Missing scopes: \(requestedScopes.split(separator: " ").filter { !token.scope.contains($0) })")
+            print("[SpotifyAuth] Extra scopes: \(token.scope.split(separator: " ").filter { !requestedScopes.contains($0) })")
+        } else {
+            print("[SpotifyAuth] Scopes match perfectly ✓")
+        }
+        
         try KeychainService.shared.save(token, forKey: keychainKey)
         print("[SpotifyAuth] Token saved to keychain successfully")
+        print("[SpotifyAuth] ===== TOKEN EXCHANGE COMPLETED =====")
         
         isAuthenticated = true
         authError = nil
@@ -215,7 +235,15 @@ final class SpotifyAuthService: ObservableObject {
     
     private func refreshAccessToken(refreshToken: String) async throws -> String {
         let url = SpotifyConfig.tokenRefreshURL
+        print("[SpotifyAuth] ===== TOKEN REFRESH STARTED =====")
         print("[SpotifyAuth] Refreshing access token at: \(url.absoluteString)")
+        
+        // Log current token scopes for comparison
+        if let currentToken = try KeychainService.shared.retrieve(SpotifyAuthToken.self, forKey: keychainKey) {
+            print("[SpotifyAuth] Current token scopes: '\(currentToken.scope)'")
+            print("[SpotifyAuth] Expected scopes: '\(SpotifyConfig.scopes.joined(separator: " "))'")
+            print("[SpotifyAuth] Scope match: \(currentToken.scope == SpotifyConfig.scopes.joined(separator: " "))")
+        }
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -224,6 +252,9 @@ final class SpotifyAuthService: ObservableObject {
         let body: [String: String] = [
             "refresh_token": refreshToken
         ]
+        
+        print("[SpotifyAuth] Refresh request body: \(body)")
+        print("[SpotifyAuth] NOTE: No scope parameter included in refresh request")
         
         request.httpBody = try JSONEncoder().encode(body)
         
@@ -239,12 +270,38 @@ final class SpotifyAuthService: ObservableObject {
         if httpResponse.statusCode != 200 {
             let errorBody = String(data: data, encoding: .utf8) ?? "(no body)"
             print("[SpotifyAuth] ERROR: Refresh failed with \(httpResponse.statusCode): \(errorBody)")
+            print("[SpotifyAuth] ERROR: Full response headers: \(httpResponse.allHeaderFields)")
+            
+            // Try to parse error details
+            if let errorJson = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
+                print("[SpotifyAuth] ERROR: Parsed error response: \(errorJson)")
+                if let error = errorJson["error"] as? String {
+                    print("[SpotifyAuth] ERROR: Error type: \(error)")
+                }
+                if let errorDescription = errorJson["error_description"] as? String {
+                    print("[SpotifyAuth] ERROR: Error description: \(errorDescription)")
+                }
+            }
+            
             throw SpotifyAuthError.serverError
         }
         
         let newToken = try JSONDecoder().decode(SpotifyAuthToken.self, from: data)
+        print("[SpotifyAuth] New token received with scopes: '\(newToken.scope)'")
+        print("[SpotifyAuth] New token expires in: \(newToken.expiresIn) seconds")
+        
+        // Check if scopes changed during refresh
+        if let oldToken = try KeychainService.shared.retrieve(SpotifyAuthToken.self, forKey: keychainKey) {
+            if oldToken.scope != newToken.scope {
+                print("[SpotifyAuth] WARNING: Scopes changed during refresh!")
+                print("[SpotifyAuth] Old scopes: '\(oldToken.scope)'")
+                print("[SpotifyAuth] New scopes: '\(newToken.scope)'")
+            }
+        }
+        
         try KeychainService.shared.save(newToken, forKey: keychainKey)
         print("[SpotifyAuth] Token refreshed and saved successfully")
+        print("[SpotifyAuth] ===== TOKEN REFRESH COMPLETED =====")
         
         return newToken.accessToken
     }

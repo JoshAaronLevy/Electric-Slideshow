@@ -11,6 +11,7 @@ import SwiftUI
 struct AppMainView: View {
     @State private var selectedSection: AppSection = .slideshows
     @State private var showingUserProfile = false
+    @StateObject private var devicesViewModel = SpotifyDevicesViewModel()
     
     var body: some View {
         VStack(spacing: 0) {
@@ -37,7 +38,7 @@ struct AppMainView: View {
                 case .music:
                     PlaylistsView()
                     case .settings:
-                        SettingsDashboardView()
+                        SettingsDashboardView(devicesViewModel: devicesViewModel)
                 case .user:
                     UserPlaceholderView()
                 }

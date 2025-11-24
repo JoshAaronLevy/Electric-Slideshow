@@ -64,6 +64,12 @@ struct SpotifyDevicesSheetView: View {
                 }
             }
         }
-        .task { await viewModel.loadDevices() }
+        .task {
+            print("[SpotifyDevicesSheetView] View appeared, starting loadDevices task")
+            await viewModel.loadDevices()
+        }
+        .onAppear {
+            print("[SpotifyDevicesSheetView] onAppear called")
+        }
     }
 }

@@ -1,158 +1,415 @@
-I’m getting a Spotify playback error in my macOS client when I try to play a slideshow with an associated Spotify playlist.
+# Backend Implementation Guide: Spotify Devices API Proxy
 
-The backend is a Node/Express app that handles Spotify OAuth and playback via the Spotify Web API. The macOS app calls this backend to:
+## Overview
 
-- Check Spotify connection status
-- List custom playlists
-- Start/stop playback of a playlist
+This guide provides comprehensive implementation instructions for creating a backend proxy endpoint for Spotify's devices API. The current frontend implementation is making direct calls to Spotify's API, which needs to be redirected through the backend to resolve authentication scope issues and provide proper error handling.
 
-When the client calls the “start playback” endpoint, Spotify returns:
+## **Critical Issues Identified**
 
+### 1. Frontend-Backend Mismatch
+- **Current Issue**: Frontend calls `https://api.spotify.com/v1/me/player/devices` directly
+- **Required Fix**: Frontend should call `/api/spotify/devices` (backend proxy)
+- **Impact**: Direct API calls bypass backend authentication validation and scope management
+
+### 2. Authentication Scope Error
+- **Current Issue**: Token refresh fails with "invalid_scope" error
+- **Root Cause**: Backend scope validation mismatches with frontend scopes
+- **Required Scopes**: `user-read-playback-state`, `user-modify-playback-state`
+
+### 3. Missing Backend Proxy Logic
+- **Current Issue**: No backend endpoint exists for device management
+- **Required**: Implement `/api/spotify/devices` proxy endpoint
+
+## **Implementation Requirements**
+
+### 1. API Endpoint Implementation
+
+#### **Endpoint**: `GET /api/spotify/devices`
+
+**Purpose**: Proxy requests to Spotify's `/v1/me/player/devices` endpoint with proper authentication and error handling.
+
+**Request Headers**:
+```
+Authorization: Bearer <backend_access_token>
+```
+
+**Response Format**:
+```json
+{
+  "devices": [
+    {
+      "id": "string",
+      "name": "string", 
+      "type": "string",
+      "is_active": boolean,
+      "is_restricted": boolean,
+      "volume_percent": number,
+      "is_private_session": boolean,
+      "is_group": boolean
+    }
+  ]
+}
+```
+
+**Error Response Format**:
+```json
 {
   "error": {
-    "status": 404,
-    "message": "Player command failed: No active device found",
-    "reason": "NO_ACTIVE_DEVICE"
+    "status": number,
+    "message": "string",
+    "reason": "string"
   }
 }
+```
 
-The access token is valid and not expired (the logs confirm this), but there is no “active device” from Spotify’s point of view.
+### 2. Authentication & Scope Handling
 
-I want you to improve our backend so that:
+#### **Scope Validation**
+The backend must validate that tokens have the required scopes:
+- `user-read-playback-state` - Required for reading device information
+- `user-modify-playback-state` - Required for controlling playback
 
-1. Scopes and auth are correct.
-2. There is a clean endpoint to list devices.
-3. The playback start endpoint handles NO_ACTIVE_DEVICE gracefully and returns clear JSON errors to the client.
-4. Playback stop is also robust.
+#### **Token Refresh Scope Fix**
+The "invalid_scope" error occurs when the backend's scope validation doesn't match the scopes requested during token refresh. Ensure:
 
-Please follow this plan and modify the existing backend code accordingly:
+1. **Consistent Scopes**: Backend refresh endpoint uses the same scopes as initial authorization
+2. **Scope Preservation**: Refresh tokens maintain original scopes
+3. **Validation Logic**: Update scope validation to accept the required playback scopes
 
----
+#### **Frontend Scopes** (for reference):
+```javascript
+[
+  "playlist-read-private",
+  "playlist-read-collaborative", 
+  "user-library-read",
+  "user-read-playback-state",
+  "user-modify-playback-state"
+]
+```
 
-1) Check and fix Spotify OAuth scopes
+### 3. Error Handling
 
-- Find the Spotify auth setup (where we build the authorize URL and request tokens).
-- Confirm the requested scopes include at least:
+#### **Authentication Failures**
+- **401 Unauthorized**: Return structured error with refresh token guidance
+- **403 Forbidden**: Return scope validation error
+- **Token Expired**: Trigger automatic token refresh
 
-  - user-read-playback-state
-  - user-modify-playback-state
-  - user-read-currently-playing
+#### **Spotify API Error Forwarding**
+- Forward Spotify API errors with proper HTTP status codes
+- Include original error messages for debugging
+- Add backend correlation IDs for request tracking
 
-- If they do not, update the Spotify OAuth configuration so future logins use those scopes.
-- Make sure the scope value is passed everywhere needed (authorize URL, refresh logic, etc.).
+#### **Network Issues**
+- Implement retry logic for transient failures
+- Set appropriate timeouts (30 seconds recommended)
+- Handle DNS resolution failures gracefully
 
----
+### 4. Response Format Standardization
 
-2) Implement or fix a “list devices” endpoint
+#### **Success Response** (200 OK):
+```json
+{
+  "success": true,
+  "data": {
+    "devices": [...]
+  },
+  "timestamp": "2025-11-24T22:19:02.232Z"
+}
+```
 
-- Add or verify an endpoint like:
+#### **Error Response** (4xx/5xx):
+```json
+{
+  "success": false,
+  "error": {
+    "code": "DEVICE_FETCH_FAILED",
+    "message": "Failed to fetch Spotify devices",
+    "details": "Original Spotify error message",
+    "status": 400
+  },
+  "timestamp": "2025-11-24T22:19:02.232Z"
+}
+```
 
-  GET /api/spotify/devices
+## **Technical Implementation Details**
 
-- This endpoint should:
+### **Backend Code Structure** (Node.js/Express Example)
 
-  - Use the stored refresh/access token for the current user.
-  - Call `GET https://api.spotify.com/v1/me/player/devices`.
-  - Handle non-200 responses gracefully (log details, return a meaningful error).
-  - Return a JSON payload like:
+```javascript
+// routes/spotifyDevices.js
+const express = require('express');
+const router = express.Router();
+const axios = require('axios');
 
-    {
-      "devices": [
-        {
-          "id": "...",
-          "name": "...",
-          "type": "...",
-          "is_active": true,
-          "is_restricted": false,
-          "volume_percent": 100
+// GET /api/spotify/devices
+router.get('/devices', authenticateToken, validateScopes, async (req, res) => {
+  try {
+    // Extract user access token from request
+    const accessToken = req.user.accessToken;
+    
+    // Validate required scopes
+    const requiredScopes = ['user-read-playback-state', 'user-modify-playback-state'];
+    const userScopes = req.user.scopes || [];
+    
+    const hasRequiredScopes = requiredScopes.every(scope => 
+      userScopes.includes(scope)
+    );
+    
+    if (!hasRequiredScopes) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: 'INSUFFICIENT_SCOPES',
+          message: 'Missing required scopes for device access',
+          required: requiredScopes,
+          available: userScopes
         }
-      ]
+      });
     }
+    
+    // Make request to Spotify API
+    const spotifyResponse = await axios.get(
+      'https://api.spotify.com/v1/me/player/devices',
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 30000 // 30 second timeout
+      }
+    );
+    
+    // Return standardized response
+    res.json({
+      success: true,
+      data: {
+        devices: spotifyResponse.data.devices || []
+      },
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    handleSpotifyError(error, res);
+  }
+});
 
-  - If the devices array is empty, return `{ "devices": [] }` rather than throwing.
+// Error handling helper
+function handleSpotifyError(error, res) {
+  console.error('Spotify API Error:', error.response?.data || error.message);
+  
+  if (error.response) {
+    // Forward Spotify API errors
+    const { status, data } = error.response;
+    
+    res.status(status).json({
+      success: false,
+      error: {
+        code: 'SPOTIFY_API_ERROR',
+        message: 'Spotify API request failed',
+        details: data.error?.message || 'Unknown error',
+        status: status,
+        reason: data.error?.reason
+      },
+      timestamp: new Date().toISOString()
+    });
+  } else if (error.code === 'ECONNABORTED') {
+    // Timeout error
+    res.status(504).json({
+      success: false,
+      error: {
+        code: 'REQUEST_TIMEOUT',
+        message: 'Request to Spotify API timed out',
+        timeout: 30000
+      },
+      timestamp: new Date().toISOString()
+    });
+  } else {
+    // Network or other errors
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to process Spotify request',
+        details: error.message
+      },
+      timestamp: new Date().toISOString()
+    });
+  }
+}
+```
 
-- Make sure this endpoint fits into whatever auth/session model we already use (e.g., user id from cookie, JWT, or session).
+### **Middleware Components**
 
----
-
-3) Harden the “start playback” endpoint
-
-- Find the playback start endpoint. It might look like:
-
-  - GET or POST /api/spotify/playback/start/:playlistId
-
-- Update its logic to:
-
-  1. Use a valid access token (refresh if necessary using our existing auth helper).
-  2. Call `GET https://api.spotify.com/v1/me/player/devices`.
-  3. If the user has **no devices**:
-
-     - Return a 409 (or 400) error with a clear JSON body:
-
-       {
-         "error": "NO_ACTIVE_DEVICE",
-         "message": "No active Spotify devices. Please open Spotify on one of your devices and start playing something once, then try again."
-       }
-
-  4. If devices are present:
-
-     - Pick a device to target. For MVP, a reasonable strategy is:
-       - Prefer a device with `is_active === true`.
-       - If none, fall back to the first device of type "Computer" or just the first device in the array.
-     - Call `PUT https://api.spotify.com/v1/me/player/play?device_id=<chosenDeviceId>` with a JSON body that starts playback of the requested playlist. For example:
-       - `context_uri` pointing to the playlist URI, or
-       - a list of track URIs.
-
-  5. Log the response status and body for debugging if there is an error, but return a clean error payload to the client instead of just passing through raw Spotify errors.
-
----
-
-4) Harden the “stop playback” endpoint
-
-- Find or add an endpoint like:
-
-  POST /api/spotify/playback/stop
-
-- Implementation:
-
-  - Use the valid token.
-  - Call `PUT https://api.spotify.com/v1/me/player/pause`.
-  - If Spotify returns NO_ACTIVE_DEVICE, treat that as a no-op (already stopped) and return a 200 or 204 to the client.
-  - For other errors, log details and return a reasonable error JSON.
-
----
-
-5) Return clear structured errors to the macOS client
-
-- For all Spotify Web API calls (devices, start, stop), avoid throwing generic errors.
-- Instead, return JSON structured like:
-
-  - On success:
-
-    { "ok": true, ... any data ... }
-
-  - On known errors (like NO_ACTIVE_DEVICE):
-
-    {
-      "ok": false,
-      "code": "NO_ACTIVE_DEVICE",
-      "message": "No active Spotify devices..."
+#### **Authentication Middleware**
+```javascript
+// middleware/authenticateToken.js
+const authenticateToken = async (req, res, next) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: 'MISSING_TOKEN',
+          message: 'Access token required'
+        }
+      });
     }
-
-  - On unexpected errors:
-
-    {
-      "ok": false,
-      "code": "UNEXPECTED_ERROR",
-      "message": "Something went wrong talking to Spotify.",
-      "details": "optional short reason or status code"
+    
+    // Verify token with your backend auth system
+    const user = await verifyBackendToken(token);
+    
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: 'INVALID_TOKEN',
+          message: 'Invalid or expired access token'
+        }
+      });
     }
+    
+    req.user = user;
+    next();
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'AUTH_ERROR',
+        message: 'Authentication failed'
+      }
+    });
+  }
+};
+```
 
-Once you’ve made these changes, please provide an overview for me on:
+#### **Scope Validation Middleware**
+```javascript
+// middleware/validateScopes.js
+const validateScopes = (requiredScopes) => {
+  return (req, res, next) => {
+    const userScopes = req.user.scopes || [];
+    const hasRequiredScopes = requiredScopes.every(scope => 
+      userScopes.includes(scope)
+    );
+    
+    if (!hasRequiredScopes) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: 'INSUFFICIENT_SCOPES',
+          message: 'Missing required scopes',
+          required: requiredScopes,
+          available: userScopes
+        }
+      });
+    }
+    
+    next();
+  };
+};
+```
 
-- The updated routes for:
-  - /api/spotify/devices
-  - /api/spotify/playback/start/:playlistId
-  - /api/spotify/playback/stop
-- The updated Spotify auth/scope configuration.
-- Any helper modules you modified for making Spotify Web API calls.
+## **Frontend Integration Changes**
+
+### **Update SpotifyAPIService.swift**
+
+Replace the direct Spotify API call in [`fetchAvailableDevices()`](Electric Slideshow/Services/SpotifyAPIService.swift:146) with backend proxy call:
+
+```swift
+// OLD: Direct Spotify API call
+let url = baseURL.appendingPathComponent("me/player/devices")
+
+// NEW: Backend proxy call
+let backendBaseURL = URL(string: "https://electric-slideshow-server.onrender.com/api/spotify")!
+let url = backendBaseURL.appendingPathComponent("devices")
+```
+
+### **Update Request Headers**
+The backend proxy expects backend authentication, not Spotify tokens:
+
+```swift
+// OLD: Spotify token
+request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+// NEW: Backend token (assuming backend handles Spotify auth)
+let backendToken = try await authService.getBackendAccessToken()
+request.setValue("Bearer \(backendToken)", forHTTPHeaderField: "Authorization")
+```
+
+## **Testing Requirements**
+
+### **Unit Tests**
+1. **Scope Validation**: Test that requests without proper scopes return 403
+2. **Token Validation**: Test that invalid backend tokens return 401
+3. **Error Forwarding**: Test that Spotify API errors are properly forwarded
+4. **Timeout Handling**: Test timeout scenarios return 504
+
+### **Integration Tests**
+1. **Happy Path**: Valid token + valid scopes → successful device list
+2. **Empty Devices**: Valid token but no devices → empty array response
+3. **Spotify Down**: Handle Spotify API unavailability gracefully
+4. **Rate Limiting**: Handle Spotify rate limits appropriately
+
+### **End-to-End Tests**
+1. **Frontend Integration**: Test frontend can successfully fetch devices through proxy
+2. **Error Display**: Test frontend properly displays backend error messages
+3. **Token Refresh**: Test token refresh works with proper scopes
+
+## **Deployment Checklist**
+
+### **Pre-Deployment**
+- [ ] Implement `/api/spotify/devices` endpoint
+- [ ] Add scope validation middleware
+- [ ] Update token refresh logic with proper scopes
+- [ ] Add comprehensive error handling
+- [ ] Implement request/response logging
+- [ ] Add monitoring and alerting
+
+### **Post-Deployment**
+- [ ] Update frontend to use backend proxy
+- [ ] Test device fetching functionality
+- [ ] Monitor error rates and response times
+- [ ] Verify scope validation works correctly
+- [ ] Test token refresh with new scopes
+
+## **Monitoring & Observability**
+
+### **Metrics to Track**
+- Request success/failure rates
+- Response times (p95, p99)
+- Spotify API error rates
+- Token refresh success rates
+- Scope validation failures
+
+### **Logging Requirements**
+- Request correlation IDs
+- User identification (anonymized)
+- Spotify API response codes
+- Error details and stack traces
+- Performance metrics
+
+### **Alerting Thresholds**
+- Error rate > 5%
+- Response time p95 > 2 seconds
+- Spotify API 4xx errors > 10%
+- Token refresh failures > 1%
+
+## **Security Considerations**
+
+1. **Token Storage**: Secure storage of backend access tokens
+2. **Rate Limiting**: Implement rate limiting per user/IP
+3. **CORS**: Configure CORS properly for frontend origins
+4. **Input Validation**: Validate all input parameters
+5. **Error Sanitization**: Don't expose internal system details in errors
+
+## **Performance Optimization**
+
+1. **Caching**: Consider caching device lists (5-minute TTL)
+2. **Connection Pooling**: Use connection pooling for Spotify API calls
+3. **Timeout Configuration**: Set appropriate timeouts (30s for device calls)
+4. **Retry Logic**: Implement exponential backoff for transient failures
+
+This implementation guide addresses all identified issues and provides a robust, scalable solution for the Spotify devices API proxy functionality.

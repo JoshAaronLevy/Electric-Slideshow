@@ -142,28 +142,52 @@ final class SpotifyAPIService: ObservableObject {
 
     // MARK: - Devices
 
-    /// Fetches available Spotify devices for playback
+    /// Fetches available Spotify devices for playback via backend proxy
     func fetchAvailableDevices() async throws -> [SpotifyDevice] {
-        let url = baseURL.appendingPathComponent("me/player/devices")
+        // Use backend proxy instead of direct Spotify API call
+        guard let backendURL = URL(string: "https://electric-slideshow-server.onrender.com/api/spotify/devices") else {
+            throw APIError.requestFailed(statusCode: 0, message: "Invalid backend proxy URL")
+        }
+        
+        print("[SpotifyAPI] Fetching available devices from backend proxy: \(backendURL.absoluteString)")
+        
         let token = try await authService.getValidAccessToken()
+        print("[SpotifyAPI] Got valid access token: \(token.prefix(10))...")
 
-        var request = URLRequest(url: url)
+        var request = URLRequest(url: backendURL)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        print("[SpotifyAPI] Authorization header set with Bearer token")
 
+        print("[SpotifyAPI] Making API request to backend proxy...")
         let (data, response) = try await URLSession.shared.data(for: request)
+        print("[SpotifyAPI] Backend proxy request completed")
 
         guard let httpResponse = response as? HTTPURLResponse else {
+            print("[SpotifyAPI] ERROR: Invalid response type - not HTTPURLResponse")
             throw APIError.requestFailed(statusCode: 0, message: "Invalid response")
         }
+        
+        print("[SpotifyAPI] Response status code: \(httpResponse.statusCode)")
 
         guard (200...299).contains(httpResponse.statusCode) else {
             let errorBody = String(data: data, encoding: .utf8) ?? "(no body)"
-            print("[SpotifyAPI] ERROR: Devices request failed with \(httpResponse.statusCode): \(errorBody)")
+            print("[SpotifyAPI] ERROR: Backend proxy devices request failed with \(httpResponse.statusCode): \(errorBody)")
+            print("[SpotifyAPI] ERROR: Response headers: \(httpResponse.allHeaderFields)")
             throw APIError.requestFailed(statusCode: httpResponse.statusCode, message: errorBody)
         }
 
-        let devicesResponse = try JSONDecoder().decode(SpotifyDevicesResponse.self, from: data)
-        return devicesResponse.devices
+        print("[SpotifyAPI] Backend proxy request successful, parsing response...")
+        print("[SpotifyAPI] Raw response data: \(String(data: data, encoding: .utf8) ?? "Unable to decode")")
+        
+        do {
+            let devicesResponse = try JSONDecoder().decode(SpotifyDevicesResponse.self, from: data)
+            print("[SpotifyAPI] Successfully decoded \(devicesResponse.devices.count) devices")
+            return devicesResponse.devices
+        } catch {
+            print("[SpotifyAPI] ERROR: Failed to decode devices response: \(error)")
+            print("[SpotifyAPI] ERROR: Decoding error details: \(error.localizedDescription)")
+            throw error
+        }
     }
     
     struct SpotifyPlaybackError: Decodable, Error {
