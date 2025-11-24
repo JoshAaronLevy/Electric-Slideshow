@@ -120,133 +120,41 @@ struct NewSlideshowFlowView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     TextField("Slideshow Title", text: $viewModel.title, prompt: Text("My Slideshow"))
                         .textFieldStyle(.roundedBorder)
-                        Form {
-                            // Summary section
-                            Section {
-                                HStack(spacing: 12) {
-                                    Image(systemName: "photo.on.rectangle.angled")
-                                        .font(.title)
-                                        .foregroundStyle(.blue)
-                                        .frame(width: 40)
-
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text("\(viewModel.selectedPhotoIds.count) Photos Selected")
-                                            .font(.headline)
-
-                                        Text("Ready to customize your slideshow")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-
-                                    Spacer()
-
-                                    Button {
-                                        currentStep = .photoSelection
-                                    } label: {
-                                        Text("Change Selection")
-                                            .font(.caption)
-                                    }
-                                    .buttonStyle(.bordered)
-                                }
-                                .padding(.vertical, 4)
-                            }
-
-                            // Spotify Devices Button
-                            Section {
-                                Button {
-                                    showingDevicesSheet = true
-                                } label: {
-                                    Label("View Spotify Devices", systemImage: "desktopcomputer")
-                                }
-                                .buttonStyle(.borderedProminent)
-                            }
-                            ...existing code...
-                        }
-                        .formStyle(.grouped)
-                        .frame(maxWidth: 600)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .sheet(isPresented: $showingDevicesSheet) {
-                            SpotifyDevicesSheet()
-                        }
-                    // MARK: - Spotify Devices Sheet
-
-                    private struct SpotifyDevicesSheet: View {
-                        @EnvironmentObject private var playlistsStore: PlaylistsStore
-                        @StateObject private var apiService = SpotifyAPIService(authService: SpotifyAuthService.shared)
-                        @State private var devices: [SpotifyDevice] = []
-                        @State private var isLoading = true
-                        @State private var error: String?
-
-                        var body: some View {
-                            NavigationStack {
-                                Group {
-                                    if isLoading {
-                                        ProgressView("Loading Spotify devices...")
-                                            .padding()
-                                    } else if let error = error {
-                                        VStack(spacing: 16) {
-                                            Image(systemName: "exclamationmark.triangle")
-                                                .font(.largeTitle)
-                                                .foregroundStyle(.orange)
-                                            Text(error)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                        .padding()
-                                    } else if devices.isEmpty {
-                                        ContentUnavailableView {
-                                            Label("No Devices Found", systemImage: "desktopcomputer")
-                                        } description: {
-                                            Text("No available Spotify playback devices were found. Make sure Spotify is open on your computer or another device.")
-                                        }
-                                    } else {
-                                        List(devices) { device in
-                                            HStack(spacing: 12) {
-                                                Image(systemName: device.is_active ? "checkmark.circle.fill" : "circle")
-                                                    .foregroundStyle(device.is_active ? .green : .secondary)
-                                                VStack(alignment: .leading, spacing: 2) {
-                                                    Text(device.name)
-                                                        .font(.headline)
-                                                    Text(device.type)
-                                                        .font(.caption)
-                                                        .foregroundStyle(.secondary)
-                                                }
-                                                Spacer()
-                                                if device.is_active {
-                                                    Text("Active")
-                                                        .font(.caption2)
-                                                        .foregroundStyle(.green)
-                                                }
-                                            }
-                                            .padding(.vertical, 4)
-                                        }
-                                    }
-                                }
-                                .navigationTitle("Spotify Devices")
-                                .toolbar {
-                                    ToolbarItem(placement: .cancellationAction) {
-                                        Button("Close") {
-                                            // Dismiss sheet
-                                            if let window = NSApplication.shared.keyWindow {
-                                                window.endSheet(window)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            .onAppear {
-                                Task {
-                                    do {
-                                        isLoading = true
-                                        devices = try await apiService.fetchAvailableDevices()
-                                        isLoading = false
-                                    } catch {
-                                        self.error = error.localizedDescription
-                                        isLoading = false
-                                    }
-                                }
-                            }
+                        .font(.body)
+                    
+                    if !viewModel.title.isEmpty {
+                        if !viewModel.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            Label("Title looks good", systemImage: "checkmark.circle.fill")
+                                .font(.caption)
+                                .foregroundStyle(.green)
+                        } else {
+                            Label("Title cannot be only whitespace", systemImage: "exclamationmark.circle.fill")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
                         }
                     }
+                }
+            } header: {
+                Text("Basic Information")
+            } footer: {
+                if viewModel.title.isEmpty {
+                    Text("Give your slideshow a memorable name")
+                        .font(.caption)
+                }
+            }
+            
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Duration per slide")
+                            .font(.body)
+                        Spacer()
+                        Text("\(viewModel.settings.durationPerSlide, specifier: "%.1f")s")
+                            .font(.body)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
+                    
                     Slider(
                         value: Binding(
                             get: { viewModel.settings.durationPerSlide },
