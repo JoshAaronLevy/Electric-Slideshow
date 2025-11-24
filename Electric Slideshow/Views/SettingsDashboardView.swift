@@ -89,6 +89,7 @@ struct SettingsTileView: View {
 // MARK: - Spotify Devices Sheet
 
 private struct SpotifyDevicesSheet: View {
+    @Environment(\.dismiss) private var dismiss
     @StateObject private var apiService = SpotifyAPIService(authService: SpotifyAuthService.shared)
     @State private var devices: [SpotifyDevice] = []
     @State private var isLoading = true
@@ -142,10 +143,7 @@ private struct SpotifyDevicesSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") {
-                        // Dismiss sheet
-                        if let window = NSApplication.shared.keyWindow {
-                            window.endSheet(window)
-                        }
+                        dismiss()
                     }
                 }
             }
@@ -157,6 +155,7 @@ private struct SpotifyDevicesSheet: View {
                     devices = try await apiService.fetchAvailableDevices()
                     isLoading = false
                 } catch {
+                    print("[SpotifyDevicesSheet] Device fetch error: \(error)")
                     self.error = error.localizedDescription
                     isLoading = false
                 }
