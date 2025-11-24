@@ -207,14 +207,28 @@ final class SlideshowPlaybackViewModel: ObservableObject {
 
             guard let device = activeDevice else {
                 showingMusicError = true
-                errorMessage = "No active Spotify device found. Please open Spotify on your Mac and start playback manually."
+                errorMessage = "We couldn’t find an active Spotify device. Open Spotify on this Mac (or another device), start playing something once, then try again."
                 return
             }
 
-            try await apiService.startPlayback(trackURIs: playlist.trackURIs, deviceId: device.deviceId)
+            do {
+                try await apiService.startPlayback(trackURIs: playlist.trackURIs, deviceId: device.deviceId)
+            } catch let playbackError as SpotifyAPIService.PlaybackError {
+                switch playbackError {
+                case .noActiveDevice(let message):
+                    showingMusicError = true
+                    errorMessage = message.isEmpty ? "We couldn’t find an active Spotify device. Open Spotify on this Mac (or another device), start playing something once, then try again." : message
+                case .generic(let message):
+                    showingMusicError = true
+                    errorMessage = message.isEmpty ? "Couldn’t start Spotify playback." : message
+                }
+            } catch {
+                showingMusicError = true
+                errorMessage = "Couldn’t start Spotify playback."
+            }
         } catch {
             showingMusicError = true
-            errorMessage = "Failed to start music playback. Make sure Spotify is open on this device."
+            errorMessage = "Couldn’t start Spotify playback."
         }
     }
     

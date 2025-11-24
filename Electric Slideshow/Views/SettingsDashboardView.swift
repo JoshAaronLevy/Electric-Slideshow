@@ -2,6 +2,8 @@ import SwiftUI
 
 struct SettingsDashboardView: View {
     @State private var showingDevicesSheet = false
+    @StateObject private var spotifyAPIService = SpotifyAPIService(authService: SpotifyAuthService.shared)
+    @StateObject private var devicesViewModel: SpotifyDevicesViewModel
     private let tiles: [SettingsTile] = [
         SettingsTile(
             title: "Playback Devices",
@@ -35,7 +37,7 @@ struct SettingsDashboardView: View {
                 Spacer()
             }
             .sheet(isPresented: $showingDevicesSheet) {
-                SpotifyDevicesSheet()
+                SpotifyDevicesSheetView(viewModel: devicesViewModel)
             }
         }
     }
