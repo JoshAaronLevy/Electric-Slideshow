@@ -66,7 +66,7 @@ struct SettingsTileView: View {
         VStack(spacing: 12) {
             Image(systemName: tile.icon)
                 .font(.system(size: 36))
-                .foregroundStyle(.accent)
+                .foregroundStyle(.secondary)
                 .frame(width: 56, height: 56)
                 .background(Color.accentColor.opacity(0.1))
                 .clipShape(RoundedRectangle(cornerRadius: 16))
