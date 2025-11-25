@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// Full-screen slideshow playback view with controls and music integration
 struct SlideshowPlaybackView: View {
@@ -101,6 +102,17 @@ struct SlideshowPlaybackView: View {
             }
         } message: {
             Text(viewModel.errorMessage ?? "Unable to start music playback. Make sure Spotify is open on this device.")
+        }
+        .background(Color.black.ignoresSafeArea())
+        .onAppear {
+            #if os(macOS)
+            // Try to full-screen the key window when slideshow starts
+            if let window = NSApplication.shared.windows.first(where: { $0.isKeyWindow }) {
+                if !window.styleMask.contains(.fullScreen) {
+                    window.toggleFullScreen(nil)
+                }
+            }
+            #endif
         }
     }
     

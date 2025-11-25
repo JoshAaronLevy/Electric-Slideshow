@@ -156,11 +156,8 @@ final class SpotifyAPIService: ObservableObject {
 
         var request = URLRequest(url: backendURL)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        print("[SpotifyAPI] Authorization header set with Bearer token")
 
-        print("[SpotifyAPI] Making API request to backend proxy...")
         let (data, response) = try await URLSession.shared.data(for: request)
-        print("[SpotifyAPI] Backend proxy request completed")
 
         guard let httpResponse = response as? HTTPURLResponse else {
             print("[SpotifyAPI] ERROR: Invalid response type - not HTTPURLResponse")
@@ -176,13 +173,15 @@ final class SpotifyAPIService: ObservableObject {
             throw APIError.requestFailed(statusCode: httpResponse.statusCode, message: errorBody)
         }
 
-        print("[SpotifyAPI] Backend proxy request successful, parsing response...")
         print("[SpotifyAPI] Raw response data: \(String(data: data, encoding: .utf8) ?? "Unable to decode")")
         
         do {
-            let devicesResponse = try JSONDecoder().decode(SpotifyDevicesResponse.self, from: data)
-            print("[SpotifyAPI] Successfully decoded \(devicesResponse.devices.count) devices")
-            return devicesResponse.devices
+            let decoder = JSONDecoder()
+            let devicesResponse = try decoder.decode(SpotifyDevicesResponse.self, from: data)
+
+            let devices = devicesResponse.data.devices
+            print("[SpotifyAPI] Successfully decoded \(devices.count) devices")
+            return devices
         } catch {
             print("[SpotifyAPI] ERROR: Failed to decode devices response: \(error)")
             print("[SpotifyAPI] ERROR: Decoding error details: \(error.localizedDescription)")
@@ -354,7 +353,13 @@ final class SpotifyAPIService: ObservableObject {
 // MARK: - Device Models
 
 struct SpotifyDevicesResponse: Decodable {
-    let devices: [SpotifyDevice]
+    let success: Bool
+    let data: DevicesContainer
+    let timestamp: String?
+
+    struct DevicesContainer: Decodable {
+        let devices: [SpotifyDevice]
+    }
 }
 
 struct SpotifyDevice: Decodable, Identifiable {
