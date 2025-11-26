@@ -11,37 +11,172 @@ import SwiftUI
 struct NowPlayingView: View {
     @EnvironmentObject private var nowPlayingStore: NowPlayingStore
 
+    private let bottomBarHeight: CGFloat = 56  // Match AppNavigationBar height
+
     var body: some View {
         ZStack {
             // Match the app’s general background style
             Color(nsColor: .windowBackgroundColor)
                 .ignoresSafeArea()
 
-            if let slideshow = nowPlayingStore.activeSlideshow {
-                // Placeholder for future full playback UI
+            VStack(spacing: 0) {
+                mainContent
+
+                NowPlayingBottomBar(slideshow: nowPlayingStore.activeSlideshow)
+                    .frame(height: bottomBarHeight)
+            }
+        }
+    }
+
+    // MARK: - Main Content
+
+    @ViewBuilder
+    private var mainContent: some View {
+        if let slideshow = nowPlayingStore.activeSlideshow {
+            // Placeholder area where the slideshow will eventually render.
+            // For now, just show the title centered to confirm layout works.
+            ZStack {
+                Color.black
+                    .ignoresSafeArea(edges: .horizontal)
+
                 VStack(spacing: 12) {
                     Text("Now Playing")
                         .font(.title)
                         .fontWeight(.semibold)
+                        .foregroundStyle(.white)
 
                     Text(slideshow.title)
                         .font(.headline)
                         .foregroundStyle(.secondary)
                 }
-            } else {
-                // Empty state when nothing is playing
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            // Empty state when nothing is playing
+            ZStack {
+                Color(nsColor: .windowBackgroundColor)
+                    .ignoresSafeArea(edges: .horizontal)
+
                 ContentUnavailableView {
                     Label("Nothing Playing", systemImage: "play.circle")
                 } description: {
                     Text("No slideshow is currently playing. Go to Slideshows to create or start one.")
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+}
+
+/// Bottom bar for slideshow + music controls.
+/// For Phase 3 this is primarily visual; we'll wire real actions later.
+private struct NowPlayingBottomBar: View {
+    let slideshow: Slideshow?
+
+    var body: some View {
+        ZStack {
+            // Slightly elevated background (similar feel to a toolbar)
+            VisualEffectView(material: .sidebar, blendingMode: .behindWindow)
+                .overlay(
+                    Divider(),
+                    alignment: .top
+                )
+
+            HStack(spacing: 16) {
+                // Left: Slideshow controls
+                HStack(spacing: 12) {
+                    Button {
+                        // previous slide (to be wired later)
+                    } label: {
+                        Image(systemName: "backward.end.fill")
+                    }
+                    .buttonStyle(.plain)
+                    .opacity(0.6) // visually indicate "not wired yet"
+
+                    Button {
+                        // play/pause (to be wired later)
+                    } label: {
+                        Image(systemName: "playpause.fill")
+                    }
+                    .buttonStyle(.plain)
+                    .opacity(0.6)
+
+                    Button {
+                        // next slide (to be wired later)
+                    } label: {
+                        Image(systemName: "forward.end.fill")
+                    }
+                    .buttonStyle(.plain)
+                    .opacity(0.6)
+
+                    Divider()
+                        .frame(height: 24)
+
+                    if let slideshow {
+                        Text(slideshow.title)
+                            .font(.subheadline)
+                            .lineLimit(1)
+                    } else {
+                        Text("No slideshow")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                // Right: Music / track info area (placeholder for now)
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("No track playing")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+
+                        Text("Spotify")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Button {
+                        // previous track (to be wired later)
+                    } label: {
+                        Image(systemName: "backward.fill")
+                    }
+                    .buttonStyle(.plain)
+                    .opacity(0.6)
+
+                    Button {
+                        // play/pause track (to be wired later)
+                    } label: {
+                        Image(systemName: "playpause.fill")
+                    }
+                    .buttonStyle(.plain)
+                    .opacity(0.6)
+
+                    Button {
+                        // next track (to be wired later)
+                    } label: {
+                        Image(systemName: "forward.fill")
+                    }
+                    .buttonStyle(.plain)
+                    .opacity(0.6)
+                }
+            }
+            .padding(.horizontal, 20)
         }
     }
 }
 
 #Preview {
     let store = NowPlayingStore()
+    store.activeSlideshow = Slideshow(
+        id: UUID(),
+        title: "Sample Slideshow",
+        createdAt: Date(),
+        updatedAt: Date(),
+        photoIdentifiers: []
+    )
+
     return NowPlayingView()
         .environmentObject(store)
 }
