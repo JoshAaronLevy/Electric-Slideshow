@@ -15,6 +15,7 @@ struct NowPlayingView: View {
     @EnvironmentObject private var playlistsStore: PlaylistsStore
 
     @StateObject private var spotifyAPIService = SpotifyAPIService(authService: SpotifyAuthService.shared)
+    @StateObject private var playbackBridge = NowPlayingPlaybackBridge()
 
     private let bottomBarHeight: CGFloat = 56
 
@@ -31,6 +32,7 @@ struct NowPlayingView: View {
                     .frame(height: bottomBarHeight)
             }
         }
+        .environmentObject(playbackBridge)
     }
 
     // MARK: - Main Content
@@ -42,7 +44,25 @@ struct NowPlayingView: View {
                 slideshow: slideshow,
                 photoService: photoService,
                 spotifyAPIService: spotifyAuthService.isAuthenticated ? spotifyAPIService : nil,
-                playlistsStore: playlistsStore
+                playlistsStore: playlistsStore,
+                onViewModelReady: { viewModel in
+                    // When the playback view comes to life, wire its controls to the bridge
+                    playbackBridge.goToPreviousSlide = {
+                        if viewModel.hasPreviousSlide {
+                            viewModel.previousSlide()
+                        }
+                    }
+
+                    playbackBridge.togglePlayPause = {
+                        viewModel.togglePlayPause()
+                    }
+
+                    playbackBridge.goToNextSlide = {
+                        if viewModel.hasNextSlide {
+                            viewModel.nextSlide()
+                        }
+                    }
+                }
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
@@ -67,6 +87,8 @@ struct NowPlayingView: View {
 private struct NowPlayingBottomBar: View {
     let slideshow: Slideshow?
 
+    @EnvironmentObject private var playbackBridge: NowPlayingPlaybackBridge
+
     var body: some View {
         ZStack {
             // Simple toolbar-like background with a top divider
@@ -80,7 +102,7 @@ private struct NowPlayingBottomBar: View {
                 // Left: Slideshow controls
                 HStack(spacing: 12) {
                     Button {
-                        // previous slide (to be wired later)
+                        playbackBridge.goToPreviousSlide?()
                     } label: {
                         Image(systemName: "backward.end.fill")
                     }
@@ -88,7 +110,7 @@ private struct NowPlayingBottomBar: View {
                     .opacity(0.6)
 
                     Button {
-                        // play/pause (to be wired later)
+                        playbackBridge.togglePlayPause?()
                     } label: {
                         Image(systemName: "playpause.fill")
                     }
@@ -96,7 +118,7 @@ private struct NowPlayingBottomBar: View {
                     .opacity(0.6)
 
                     Button {
-                        // next slide (to be wired later)
+                        playbackBridge.goToNextSlide?()
                     } label: {
                         Image(systemName: "forward.end.fill")
                     }

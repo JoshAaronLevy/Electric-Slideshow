@@ -3,13 +3,17 @@ import AppKit
 
 struct SlideshowPlaybackView: View {
     @StateObject private var viewModel: SlideshowPlaybackViewModel
+    @EnvironmentObject private var playbackBridge: NowPlayingPlaybackBridge
     @FocusState private var isFocused: Bool
+
+    private let onViewModelReady: ((SlideshowPlaybackViewModel) -> Void)?
 
     init(
         slideshow: Slideshow,
         photoService: PhotoLibraryService,
         spotifyAPIService: SpotifyAPIService?,
-        playlistsStore: PlaylistsStore?
+        playlistsStore: PlaylistsStore?,
+        onViewModelReady: ((SlideshowPlaybackViewModel) -> Void)? = nil
     ) {
         _viewModel = StateObject(wrappedValue: SlideshowPlaybackViewModel(
             slideshow: slideshow,
@@ -17,6 +21,7 @@ struct SlideshowPlaybackView: View {
             spotifyAPIService: spotifyAPIService,
             playlistsStore: playlistsStore
         ))
+        self.onViewModelReady = onViewModelReady
     }
     
     var body: some View {
@@ -61,10 +66,39 @@ struct SlideshowPlaybackView: View {
         .task {
             await viewModel.startPlayback()
         }
+        .onAppear {
+            // Let the parent know about our view model so it can bridge controls
+            onViewModelReady?(viewModel)
+
+            // Also wire directly into the playbackBridge in case we ever want to
+            // use it from other contexts (not strictly required for Stage 3,
+            // but keeps things consistent).
+            playbackBridge.goToPreviousSlide = {
+                if viewModel.hasPreviousSlide {
+                    viewModel.previousSlide()
+                }
+            }
+
+            playbackBridge.togglePlayPause = {
+                viewModel.togglePlayPause()
+            }
+
+            playbackBridge.goToNextSlide = {
+                if viewModel.hasNextSlide {
+                    viewModel.nextSlide()
+                }
+            }
+        }
         .onDisappear {
+            // Stop playback as before
             Task {
                 await viewModel.stopPlayback()
             }
+
+            // Clear out the bridge commands when this view goes away
+            playbackBridge.goToPreviousSlide = nil
+            playbackBridge.togglePlayPause = nil
+            playbackBridge.goToNextSlide = nil
         }
         .focusable()
         .focused($isFocused)
