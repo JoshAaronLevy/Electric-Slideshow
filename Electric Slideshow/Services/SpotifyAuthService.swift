@@ -5,8 +5,6 @@ import AppKit
 /// Service for managing Spotify OAuth authentication flow
 @MainActor
 final class SpotifyAuthService: ObservableObject {
-    var objectWillChange = ObservableObjectPublisher()
-    
     static let shared = SpotifyAuthService()
     
     @Published var isAuthenticated = false
