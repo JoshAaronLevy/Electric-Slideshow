@@ -2,6 +2,7 @@ import Foundation
 import AppKit
 import Combine
 import Photos
+import AppKit
 
 /// ViewModel for managing slideshow playback with music integration
 @MainActor
@@ -13,6 +14,9 @@ final class SlideshowPlaybackViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var showingMusicError: Bool = false
     @Published var currentPlaybackState: SpotifyPlaybackState?
+    /// When true, the music error alert should offer a “Download Spotify” button
+    /// rather than just “Continue without music”.
+    @Published var requiresSpotifyAppInstall: Bool = false
     
     private var slideTimer: Timer?
     private var playbackCheckTimer: Timer?
@@ -186,56 +190,114 @@ final class SlideshowPlaybackViewModel: ObservableObject {
     // MARK: - Music Playback
     
     private func startMusic() async {
+        guard let apiService = spotifyAPIService else { return }
         guard let playlistId = slideshow.settings.linkedPlaylistId,
-              let playlistsStore = playlistsStore,
-              let apiService = spotifyAPIService else {
-            // No music configured or Spotify not available
+            let playlist = playlistsStore?.playlists.first(where: { $0.id == playlistId })
+        else {
             return
         }
 
-        // Find the app playlist
-        guard let playlist = playlistsStore.playlists.first(where: { $0.id == playlistId }) else {
-            errorMessage = "Playlist not found"
-            return
-        }
-
-        guard !playlist.trackURIs.isEmpty else {
-            errorMessage = "Playlist is empty"
+        // Ensure the Spotify macOS app exists and is launched (if available)
+        let desktopReady = await ensureSpotifyDesktopAvailable()
+        if !desktopReady {
+            // In the “missing app” or “failed to launch” cases, we’ve already set error UI.
             return
         }
 
         do {
-            // Fetch available devices
             let devices = try await apiService.fetchAvailableDevices()
-            // Prefer active device, fallback to device of type "Computer" (Mac)
-            let activeDevice = devices.first(where: { $0.is_active })
-                ?? devices.first(where: { $0.type.lowercased() == "computer" })
 
-            guard let device = activeDevice else {
+            guard !devices.isEmpty else {
                 showingMusicError = true
-                errorMessage = "We couldn’t find an active Spotify device. Open Spotify on this Mac (or another device), start playing something once, then try again."
+                errorMessage =
+                    "We couldn’t find any Spotify playback devices on your account.\n\n" +
+                    "Open Spotify on this Mac or another device and try again."
                 return
             }
 
-            do {
-                try await apiService.startPlayback(trackURIs: playlist.trackURIs, deviceId: device.deviceId)
-            } catch let playbackError as SpotifyAPIService.PlaybackError {
-                switch playbackError {
-                case .noActiveDevice(let message):
-                    showingMusicError = true
-                    errorMessage = message.isEmpty ? "We couldn’t find an active Spotify device. Open Spotify on this Mac (or another device), start playing something once, then try again." : message
-                case .generic(let message):
-                    showingMusicError = true
-                    errorMessage = message.isEmpty ? "Couldn’t start Spotify playback." : message
-                }
-            } catch {
+            // Prefer an active device, then a “Computer” (this Mac), then just the first one
+            let targetDevice =
+                devices.first(where: { $0.is_active }) ??
+                devices.first(where: { $0.type.lowercased() == "computer" }) ??
+                devices.first!
+
+            print("[SlideshowPlaybackViewModel] Using Spotify device: \(targetDevice.name) (\(targetDevice.type))")
+
+            try await apiService.startPlayback(
+                trackURIs: playlist.trackURIs,
+                deviceId: targetDevice.deviceId
+            )
+        } catch let playbackError as SpotifyAPIService.PlaybackError {
+            switch playbackError {
+            case .noActiveDevice(let message):
                 showingMusicError = true
-                errorMessage = "Couldn’t start Spotify playback."
+                errorMessage = (
+                    message.isEmpty
+                    ? "Spotify couldn’t find an active playback device.\n\n" +
+                    "Make sure Spotify is open on this Mac or another device " +
+                    "and start playing any track once, then try again."
+                    : message
+                )
+
+            case .generic(let message):
+                showingMusicError = true
+                errorMessage = message.isEmpty ?
+                    "Couldn’t start Spotify playback." :
+                    message
             }
         } catch {
             showingMusicError = true
             errorMessage = "Couldn’t start Spotify playback."
         }
+    }
+
+    // MARK: - Spotify Desktop Integration
+
+    /// Ensures that the Spotify macOS app is installed, and launches it if needed.
+    /// - Returns: `true` if the app is installed (launched or already running), `false` if not installed.
+    @MainActor
+    private func ensureSpotifyDesktopAvailable() async -> Bool {
+        let bundleId = "com.spotify.client"
+        let workspace = NSWorkspace.shared
+
+        // Reset any previous “missing app” state
+        requiresSpotifyAppInstall = false
+
+        // 1. Check if the Spotify app is installed at all
+        guard let appURL = workspace.urlForApplication(withBundleIdentifier: bundleId) else {
+            // Not installed → show a specific error and mark that we need to offer “Download”
+            errorMessage =
+                """
+                Spotify for macOS does not appear to be installed.
+
+                To enable music playback in Electric Slideshow, you’ll need:
+                • The Spotify app installed on this Mac
+                • An active Spotify Premium subscription
+                """
+            requiresSpotifyAppInstall = true
+            showingMusicError = true
+            return false
+        }
+
+        // 2. If it is installed but not running, launch it
+        let isRunning = workspace.runningApplications.contains { $0.bundleIdentifier == bundleId }
+
+        if !isRunning {
+            do {
+                try workspace.launchApplication(at: appURL,
+                                                options: [.default],
+                                                configuration: [:])
+                // Give Spotify a brief moment to launch and register as a device
+                try await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
+            } catch {
+                print("[SlideshowPlaybackViewModel] Failed to launch Spotify app: \(error)")
+                errorMessage = "Couldn’t open the Spotify app on this Mac."
+                showingMusicError = true
+                return false
+            }
+        }
+
+        return true
     }
     
     private func stopMusic() async {
@@ -366,5 +428,12 @@ final class SlideshowPlaybackViewModel: ObservableObject {
         } catch {
             errorMessage = "Failed to skip track"
         }
+    }
+
+    /// Opens the Spotify download page in the user’s default browser.
+    @MainActor
+    func openSpotifyDownloadPage() {
+        guard let url = URL(string: "https://www.spotify.com/download/mac") else { return }
+        NSWorkspace.shared.open(url)
     }
 }

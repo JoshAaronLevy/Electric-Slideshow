@@ -140,12 +140,24 @@ struct SlideshowPlaybackView: View {
             }
             return .handled
         }
-        .alert("Music Playback Failed", isPresented: $viewModel.showingMusicError) {
-            Button("Continue Without Music") {
-                viewModel.showingMusicError = false
-            }
-            Button("Cancel", role: .cancel) {
-                viewModel.showingMusicError = false
+        .alert("Music Playback", isPresented: $viewModel.showingMusicError) {
+            if viewModel.requiresSpotifyAppInstall {
+                // Missing Spotify app case
+                Button("Download Spotify") {
+                    viewModel.openSpotifyDownloadPage()
+                    viewModel.showingMusicError = false
+                }
+                Button("Dismiss", role: .cancel) {
+                    viewModel.showingMusicError = false
+                }
+            } else {
+                // Generic playback error case
+                Button("Continue Without Music") {
+                    viewModel.showingMusicError = false
+                }
+                Button("Dismiss", role: .cancel) {
+                    viewModel.showingMusicError = false
+                }
             }
         } message: {
             Text(viewModel.errorMessage ?? "Unable to start music playback. Make sure Spotify is open on this device.")
