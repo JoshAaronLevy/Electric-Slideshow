@@ -330,6 +330,21 @@ final class SlideshowPlaybackViewModel: ObservableObject {
             errorMessage = "Music control failed"
         }
     }
+
+    /// Toggles **only** the Spotify playback (no effect on slideshow timer or slide index).
+    func toggleMusicPlayPause() {
+        // If we don't know the state yet, try to resume – it's more useful than a no-op.
+        if let playback = currentPlaybackState {
+            if playback.isPlaying {
+                pauseMusicIfNeeded()
+            } else {
+                resumeMusicIfNeeded()
+            }
+        } else {
+            // No state yet – optimistically try to resume
+            resumeMusicIfNeeded()
+        }
+    }
     
     func skipToNextTrack() async {
         guard let apiService = spotifyAPIService else { return }

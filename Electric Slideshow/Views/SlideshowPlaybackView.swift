@@ -88,6 +88,23 @@ struct SlideshowPlaybackView: View {
                     viewModel.nextSlide()
                 }
             }
+
+            // Music-only controls
+            playbackBridge.musicPreviousTrack = {
+                Task {
+                    await viewModel.skipToPreviousTrack()
+                }
+            }
+
+            playbackBridge.musicTogglePlayPause = {
+                viewModel.toggleMusicPlayPause()
+            }
+
+            playbackBridge.musicNextTrack = {
+                Task {
+                    await viewModel.skipToNextTrack()
+                }
+            }
         }
         .onDisappear {
             // Stop playback as before
@@ -99,6 +116,11 @@ struct SlideshowPlaybackView: View {
             playbackBridge.goToPreviousSlide = nil
             playbackBridge.togglePlayPause = nil
             playbackBridge.goToNextSlide = nil
+
+            // Clear music commands
+            playbackBridge.musicPreviousTrack = nil
+            playbackBridge.musicTogglePlayPause = nil
+            playbackBridge.musicNextTrack = nil
         }
         .focusable()
         .focused($isFocused)

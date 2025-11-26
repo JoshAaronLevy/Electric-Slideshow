@@ -141,41 +141,43 @@ private struct NowPlayingBottomBar: View {
 
                 Spacer()
 
-                // Right: Music / track info area (placeholder for now)
+                // Right: Music / track controls
                 HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("No track playing")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-
-                        Text("Spotify")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-
+                    // Previous track
                     Button {
-                        // previous track (to be wired later)
+                        playbackBridge.musicPreviousTrack?()
                     } label: {
                         Image(systemName: "backward.fill")
                     }
                     .buttonStyle(.plain)
                     .opacity(0.6)
 
+                    // Play/Pause music only (does NOT affect slideshow)
                     Button {
-                        // play/pause track (to be wired later)
+                        playbackBridge.musicTogglePlayPause?()
                     } label: {
                         Image(systemName: "playpause.fill")
                     }
                     .buttonStyle(.plain)
                     .opacity(0.6)
 
+                    // Next track
                     Button {
-                        // next track (to be wired later)
+                        playbackBridge.musicNextTrack?()
                     } label: {
                         Image(systemName: "forward.fill")
                     }
                     .buttonStyle(.plain)
                     .opacity(0.6)
+
+                    Divider()
+                        .frame(height: 24)
+
+                    // Placeholder text – we can wire real track info later
+                    Text("Spotify")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
             }
             .padding(.horizontal, 20)

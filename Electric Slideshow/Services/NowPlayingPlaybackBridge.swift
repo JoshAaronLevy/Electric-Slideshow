@@ -12,4 +12,9 @@ final class NowPlayingPlaybackBridge: ObservableObject {
     var goToPreviousSlide: (() -> Void)?
     var togglePlayPause: (() -> Void)?
     var goToNextSlide: (() -> Void)?
+
+    // Music-only controls (should NOT affect slideshow timer / slides)
+    var musicPreviousTrack: (() -> Void)?
+    var musicTogglePlayPause: (() -> Void)?
+    var musicNextTrack: (() -> Void)?
 }
