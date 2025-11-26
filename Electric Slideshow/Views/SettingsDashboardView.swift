@@ -2,23 +2,21 @@ import SwiftUI
 
 struct SettingsDashboardView: View {
     @State private var showingDevicesSheet = false
-    @StateObject private var spotifyAPIService = SpotifyAPIService(authService: SpotifyAuthService.shared)
-    @StateObject private var devicesViewModel: SpotifyDevicesViewModel
-    
+    @ObservedObject private var devicesViewModel: SpotifyDevicesViewModel  // ← changed
+
     init(devicesViewModel: SpotifyDevicesViewModel) {
-        self._devicesViewModel = StateObject(wrappedValue: devicesViewModel)
+        self.devicesViewModel = devicesViewModel
     }
-    
+
     private let tiles: [SettingsTile] = [
         SettingsTile(
             title: "Playback Devices",
             subtitle: "View Available Spotify Connected Devices",
             icon: "hifispeaker.and.homepod",
             action: .playbackDevices
-        ),
-        // Future tiles can be added here
+        )
     ]
-    
+
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 24) {
@@ -27,8 +25,11 @@ struct SettingsDashboardView: View {
                     .fontWeight(.bold)
                     .padding(.top, 24)
                     .padding(.leading, 16)
-                
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 20), count: 4), spacing: 20) {
+
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible(), spacing: 20), count: 4),
+                    spacing: 20
+                ) {
                     ForEach(tiles) { tile in
                         Button {
                             handleTileAction(tile.action)
@@ -39,6 +40,7 @@ struct SettingsDashboardView: View {
                     }
                 }
                 .padding(.horizontal, 16)
+
                 Spacer()
             }
             .sheet(isPresented: $showingDevicesSheet) {
@@ -46,7 +48,7 @@ struct SettingsDashboardView: View {
             }
         }
     }
-    
+
     private func handleTileAction(_ action: SettingsTile.Action) {
         print("[SettingsDashboardView] handleTileAction called with: \(action)")
         switch action {

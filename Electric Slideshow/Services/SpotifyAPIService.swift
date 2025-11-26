@@ -210,7 +210,17 @@ final class SpotifyAPIService: ObservableObject {
     }
 
     func startPlayback(trackURIs: [String], deviceId: String? = nil) async throws {
-        let url = baseURL.appendingPathComponent("me/player/play")
+        // Build URL with optional ?device_id=...
+        var components = URLComponents(url: baseURL.appendingPathComponent("me/player/play"),
+                                    resolvingAgainstBaseURL: false)!
+        if let deviceId = deviceId {
+            components.queryItems = [URLQueryItem(name: "device_id", value: deviceId)]
+        }
+
+        guard let url = components.url else {
+            throw PlaybackError.generic(message: "Invalid playback URL")
+        }
+
         let token = try await authService.getValidAccessToken()
 
         var request = URLRequest(url: url)
@@ -218,32 +228,40 @@ final class SpotifyAPIService: ObservableObject {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        var body: [String: Any] = ["uris": trackURIs]
-        if let deviceId = deviceId {
-            body["device_id"] = deviceId
+        // If you have explicit track URIs, pass them; if you later switch to playlist context,
+        // you’ll change this to `context_uri`.
+        var body: [String: Any] = [:]
+        if !trackURIs.isEmpty {
+            body["uris"] = trackURIs
         }
+
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw PlaybackError.generic(message: "No response from Spotify API")
+            throw PlaybackError.generic(message: "Invalid response from Spotify")
         }
 
-        guard (200...299).contains(httpResponse.statusCode) else {
-            let errorBody = String(data: data, encoding: .utf8) ?? "(no body)"
-            print("[SpotifyAPI] ERROR: Start playback failed with \(httpResponse.statusCode): \(errorBody)")
-            // Try to decode structured error
-            if let errorPayload = try? JSONDecoder().decode(SpotifyPlaybackError.self, from: data),
-               let reason = errorPayload.reason {
-                if reason == "NO_ACTIVE_DEVICE" {
-                    throw PlaybackError.noActiveDevice(message: errorPayload.message ?? "No active Spotify device found.")
-                } else {
-                    throw PlaybackError.generic(message: errorPayload.message ?? "Playback failed.")
-                }
-            }
-            throw PlaybackError.generic(message: errorBody)
+        if (200..<300).contains(httpResponse.statusCode) {
+            return
         }
+
+        // Existing error handling remains the same
+        let errorBody = String(data: data, encoding: .utf8) ?? "Unknown error"
+        if let errorPayload = try? JSONDecoder().decode(SpotifyPlaybackError.self, from: data),
+        let reason = errorPayload.reason {
+            if reason == "NO_ACTIVE_DEVICE" {
+                throw PlaybackError.noActiveDevice(
+                    message: errorPayload.message ?? "No active Spotify device found."
+                )
+            } else {
+                throw PlaybackError.generic(
+                    message: errorPayload.message ?? "Playback failed."
+                )
+            }
+        }
+        throw PlaybackError.generic(message: errorBody)
     }
     
     func pausePlayback() async throws {
