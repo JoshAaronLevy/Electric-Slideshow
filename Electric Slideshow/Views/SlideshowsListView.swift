@@ -13,12 +13,13 @@ struct SlideshowsListView: View {
     @EnvironmentObject private var photoService: PhotoLibraryService
     @EnvironmentObject private var spotifyAuthService: SpotifyAuthService
     @EnvironmentObject private var playlistsStore: PlaylistsStore
-    @EnvironmentObject private var nowPlayingStore: NowPlayingStore
+
+    /// Callback into the app shell to start playback & navigate to Now Playing
+    let onStartPlayback: (Slideshow) -> Void
+
     @State private var showingNewSlideshowFlow = false
     @State private var slideshowToEdit: Slideshow?
     @State private var slideshowToDelete: Slideshow?
-    @State private var activeSlideshowForPlayback: Slideshow?
-    @StateObject private var spotifyAPIService: SpotifyAPIService
     
     // 4-column grid layout
     private let columns = [
@@ -27,10 +28,6 @@ struct SlideshowsListView: View {
         GridItem(.flexible(), spacing: 16),
         GridItem(.flexible(), spacing: 16)
     ]
-    
-    init() {
-        self._spotifyAPIService = StateObject(wrappedValue: SpotifyAPIService(authService: SpotifyAuthService.shared))
-    }
     
     var body: some View {
         NavigationStack {
@@ -67,14 +64,6 @@ struct SlideshowsListView: View {
                 }
             } message: { slideshow in
                 Text("Are you sure you want to delete \"\(slideshow.title)\"? This action cannot be undone.")
-            }
-            .sheet(item: $activeSlideshowForPlayback) { slideshow in
-                SlideshowPlaybackView(
-                    slideshow: slideshow,
-                    photoService: photoService,
-                    spotifyAPIService: spotifyAuthService.isAuthenticated ? spotifyAPIService : nil,
-                    playlistsStore: playlistsStore
-                )
             }
         }
     }
@@ -126,11 +115,7 @@ struct SlideshowsListView: View {
                     SlideshowCardView(
                         slideshow: slideshow,
                         onPlay: {
-                            // Update global "now playing" slideshow
-                            nowPlayingStore.activeSlideshow = slideshow
-
-                            // Keep existing sheet-based playback for now
-                            activeSlideshowForPlayback = slideshow
+                            onStartPlayback(slideshow)
                         },
                         onEdit: {
                             slideshowToEdit = slideshow
@@ -150,12 +135,8 @@ struct SlideshowsListView: View {
 }
 
 #Preview {
-    let photoService = PhotoLibraryService()
-    let nowPlayingStore = NowPlayingStore()
-
-    return SlideshowsListView()
-        .environmentObject(photoService)
+    SlideshowsListView { _ in }
+        .environmentObject(PhotoLibraryService())
         .environmentObject(SpotifyAuthService.shared)
         .environmentObject(PlaylistsStore())
-        .environmentObject(nowPlayingStore)
 }

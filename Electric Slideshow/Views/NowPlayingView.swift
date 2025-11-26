@@ -10,8 +10,13 @@ import SwiftUI
 /// Main Now Playing screen that will host slideshow + music playback
 struct NowPlayingView: View {
     @EnvironmentObject private var nowPlayingStore: NowPlayingStore
+    @EnvironmentObject private var photoService: PhotoLibraryService
+    @EnvironmentObject private var spotifyAuthService: SpotifyAuthService
+    @EnvironmentObject private var playlistsStore: PlaylistsStore
 
-    private let bottomBarHeight: CGFloat = 56  // Match AppNavigationBar height
+    @StateObject private var spotifyAPIService = SpotifyAPIService(authService: SpotifyAuthService.shared)
+
+    private let bottomBarHeight: CGFloat = 56
 
     var body: some View {
         ZStack {
@@ -33,23 +38,12 @@ struct NowPlayingView: View {
     @ViewBuilder
     private var mainContent: some View {
         if let slideshow = nowPlayingStore.activeSlideshow {
-            // Placeholder area where the slideshow will eventually render.
-            // For now, just show the title centered to confirm layout works.
-            ZStack {
-                Color.black
-                    .ignoresSafeArea(edges: .horizontal)
-
-                VStack(spacing: 12) {
-                    Text("Now Playing")
-                        .font(.title)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.white)
-
-                    Text(slideshow.title)
-                        .font(.headline)
-                        .foregroundStyle(.secondary)
-                }
-            }
+            SlideshowPlaybackView(
+                slideshow: slideshow,
+                photoService: photoService,
+                spotifyAPIService: spotifyAuthService.isAuthenticated ? spotifyAPIService : nil,
+                playlistsStore: playlistsStore
+            )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             // Empty state when nothing is playing

@@ -12,6 +12,8 @@ struct AppMainView: View {
     @State private var selectedSection: AppSection = .nowPlaying
     @State private var showingUserProfile = false
     @StateObject private var devicesViewModel = SpotifyDevicesViewModel()
+
+    @EnvironmentObject private var nowPlayingStore: NowPlayingStore
     
     var body: some View {
         VStack(spacing: 0) {
@@ -36,7 +38,13 @@ struct AppMainView: View {
                 case .nowPlaying:
                     NowPlayingView()
                 case .slideshows:
-                    SlideshowsListView()
+                    SlideshowsListView { slideshow in
+                        // 1. Set the global "now playing" slideshow
+                        nowPlayingStore.activeSlideshow = slideshow
+
+                        // 2. Navigate to the Now Playing section
+                        selectedSection = .nowPlaying
+                    }
                 case .music:
                     PlaylistsView()
                 case .settings:
