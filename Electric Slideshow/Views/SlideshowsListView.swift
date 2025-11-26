@@ -13,6 +13,7 @@ struct SlideshowsListView: View {
     @EnvironmentObject private var photoService: PhotoLibraryService
     @EnvironmentObject private var spotifyAuthService: SpotifyAuthService
     @EnvironmentObject private var playlistsStore: PlaylistsStore
+    @EnvironmentObject private var nowPlayingStore: NowPlayingStore
     @State private var showingNewSlideshowFlow = false
     @State private var slideshowToEdit: Slideshow?
     @State private var slideshowToDelete: Slideshow?
@@ -125,6 +126,10 @@ struct SlideshowsListView: View {
                     SlideshowCardView(
                         slideshow: slideshow,
                         onPlay: {
+                            // Update global "now playing" slideshow
+                            nowPlayingStore.activeSlideshow = slideshow
+
+                            // Keep existing sheet-based playback for now
                             activeSlideshowForPlayback = slideshow
                         },
                         onEdit: {
@@ -145,5 +150,12 @@ struct SlideshowsListView: View {
 }
 
 #Preview {
-    SlideshowsListView()
+    let photoService = PhotoLibraryService()
+    let nowPlayingStore = NowPlayingStore()
+
+    return SlideshowsListView()
+        .environmentObject(photoService)
+        .environmentObject(SpotifyAuthService.shared)
+        .environmentObject(PlaylistsStore())
+        .environmentObject(nowPlayingStore)
 }
