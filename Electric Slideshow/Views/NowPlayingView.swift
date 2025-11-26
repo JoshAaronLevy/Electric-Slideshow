@@ -75,8 +75,8 @@ private struct NowPlayingBottomBar: View {
 
     var body: some View {
         ZStack {
-            // Slightly elevated background (similar feel to a toolbar)
-            VisualEffectView(material: .sidebar, blendingMode: .behindWindow)
+            // Simple toolbar-like background with a top divider
+            Color(nsColor: .windowBackgroundColor)
                 .overlay(
                     Divider(),
                     alignment: .top
@@ -91,7 +91,7 @@ private struct NowPlayingBottomBar: View {
                         Image(systemName: "backward.end.fill")
                     }
                     .buttonStyle(.plain)
-                    .opacity(0.6) // visually indicate "not wired yet"
+                    .opacity(0.6)
 
                     Button {
                         // play/pause (to be wired later)
@@ -168,15 +168,6 @@ private struct NowPlayingBottomBar: View {
 }
 
 #Preview {
-    let store = NowPlayingStore()
-    store.activeSlideshow = Slideshow(
-        id: UUID(),
-        title: "Sample Slideshow",
-        createdAt: Date(),
-        updatedAt: Date(),
-        photoIdentifiers: []
-    )
-
-    return NowPlayingView()
-        .environmentObject(store)
+    NowPlayingView()
+        .environmentObject(NowPlayingStore())
 }
