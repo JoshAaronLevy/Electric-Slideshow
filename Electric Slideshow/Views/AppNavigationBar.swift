@@ -117,7 +117,7 @@ struct AppNavigationBar: View {
             appTitleTop: "Electric",
             appTitleBottom: "Slideshow",
             currentSectionTitle: "Slideshows",
-            sections: [.slideshows, .music, .settings, .user],
+            sections: [.nowPlaying, .slideshows, .music, .settings, .user],
             selectedSection: .slideshows,
             onSectionSelected: { _ in },
             onUserIconTapped: { }
@@ -133,7 +133,7 @@ struct AppNavigationBar: View {
             appTitleTop: "Electric",
             appTitleBottom: "Slideshow",
             currentSectionTitle: "Playlists",
-            sections: [.slideshows, .music, .settings, .user],
+            sections: [.nowPlaying, .slideshows, .music, .settings, .user],
             selectedSection: .music,
             onSectionSelected: { _ in },
             onUserIconTapped: { }
@@ -149,7 +149,7 @@ struct AppNavigationBar: View {
             appTitleTop: "Electric",
             appTitleBottom: "Slideshow",
             currentSectionTitle: "Settings",
-            sections: [.slideshows, .music, .settings, .user],
+            sections: [.nowPlaying, .slideshows, .music, .settings, .user],
             selectedSection: .settings,
             onSectionSelected: { _ in },
             onUserIconTapped: { }
@@ -166,7 +166,7 @@ struct AppNavigationBar: View {
             appTitleTop: "Electric",
             appTitleBottom: "Slideshow",
             currentSectionTitle: "Slideshows",
-            sections: [.slideshows, .music, .settings, .user],
+            sections: [.nowPlaying, .slideshows, .music, .settings, .user],
             selectedSection: .slideshows,
             onSectionSelected: { _ in },
             onUserIconTapped: { }
@@ -182,7 +182,7 @@ struct AppNavigationBar: View {
             appTitleTop: "Electric",
             appTitleBottom: "Slideshow",
             currentSectionTitle: "Playlists",
-            sections: [.slideshows, .music, .settings, .user],
+            sections: [.nowPlaying, .slideshows, .music, .settings, .user],
             selectedSection: .music,
             onSectionSelected: { _ in },
             onUserIconTapped: { }
