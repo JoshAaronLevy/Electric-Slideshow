@@ -143,9 +143,15 @@ final class SlideshowPlaybackViewModel: ObservableObject {
         isPlaying.toggle()
         
         if isPlaying {
+            // Resume slideshow timer
             startSlideTimer()
+            // Resume Spotify from where it left off
+            resumeMusicIfNeeded()
         } else {
+            // Pause slideshow timer
             stopSlideTimer()
+            // Pause Spotify playback
+            pauseMusicIfNeeded()
         }
     }
     
@@ -239,6 +245,43 @@ final class SlideshowPlaybackViewModel: ObservableObject {
             try await spotifyAPIService?.pausePlayback()
         } catch {
             // Ignore stop errors
+        }
+    }
+
+    private func pauseMusicIfNeeded() {
+        guard
+            slideshow.settings.linkedPlaylistId != nil,
+            let apiService = spotifyAPIService
+        else {
+            return
+        }
+
+        Task {
+            do {
+                try await apiService.pausePlayback()
+            } catch {
+                // Don’t break the slideshow if Spotify pause fails
+                print("[SlideshowPlaybackViewModel] Failed to pause Spotify playback: \(error)")
+            }
+        }
+    }
+
+    // Called when the slideshow is resumed by the user
+    private func resumeMusicIfNeeded() {
+        guard
+            slideshow.settings.linkedPlaylistId != nil,
+            let apiService = spotifyAPIService
+        else {
+            return
+        }
+
+        Task {
+            do {
+                // Resume playback from wherever Spotify left off
+                try await apiService.resumePlayback()
+            } catch {
+                print("[SlideshowPlaybackViewModel] Failed to resume Spotify playback: \(error)")
+            }
         }
     }
     

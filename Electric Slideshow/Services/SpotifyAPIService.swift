@@ -284,6 +284,41 @@ final class SpotifyAPIService: ObservableObject {
             throw APIError.playbackFailed
         }
     }
+
+    func resumePlayback(deviceId: String? = nil) async throws {
+        // Build URL with optional ?device_id=...
+        var components = URLComponents(
+            url: baseURL.appendingPathComponent("me/player/play"),
+            resolvingAgainstBaseURL: false
+        )!
+
+        if let deviceId = deviceId {
+            components.queryItems = [URLQueryItem(name: "device_id", value: deviceId)]
+        }
+
+        guard let url = components.url else {
+            throw APIError.playbackFailed
+        }
+
+        let token = try await authService.getValidAccessToken()
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        // NOTE: no body → Spotify resumes current playback position
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.playbackFailed
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let errorBody = String(data: data, encoding: .utf8) ?? "(no body)"
+            print("[SpotifyAPI] ERROR: Resume playback failed with \(httpResponse.statusCode): \(errorBody)")
+            throw APIError.playbackFailed
+        }
+    }
     
     func skipToNext() async throws {
         let url = baseURL.appendingPathComponent("me/player/next")

@@ -31,17 +31,28 @@ struct SlideshowPlaybackView: View {
                     .foregroundStyle(.white)
             } else if let image = viewModel.currentImage {
                 GeometryReader { geometry in
-                    Image(nsImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: geometry.size.width, height: geometry.size.height)
-                        .id(viewModel.currentIndex) // Force view update
-                        .transition(.opacity)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            // Only interaction with the photo: toggle slideshow play/pause
-                            viewModel.togglePlayPause()
+                    ZStack {
+                        Image(nsImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: geometry.size.width, height: geometry.size.height)
+                            .id(viewModel.currentIndex) // Force view update
+                            .transition(.opacity)
+
+                        // Paused state overlay
+                        if !viewModel.isPlaying {
+                            Image(systemName: "play.circle.fill")
+                                .font(.system(size: 96))
+                                .foregroundStyle(.white.opacity(0.9))
+                                .shadow(radius: 10)
                         }
+                    }
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        // Only interaction with the photo: toggle slideshow + music play/pause
+                        viewModel.togglePlayPause()
+                    }
                 }
                 .ignoresSafeArea(edges: .all)
             }
