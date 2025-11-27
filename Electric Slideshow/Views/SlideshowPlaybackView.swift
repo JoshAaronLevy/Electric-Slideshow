@@ -104,7 +104,14 @@ struct SlideshowPlaybackView: View {
                 }
             }
 
-            // Seed the sidebar / bridge with the current state
+            // Initialize the view model with the current clip mode
+            viewModel.updateClipMode(playbackBridge.clipMode)
+
+            // React to future changes from the sidebar
+            playbackBridge.onClipModeChanged = { [weak viewModel] newMode in
+                viewModel?.updateClipMode(newMode)
+            }
+
             syncPlaybackBridge()
         }
         // Whenever the slideshow or playback state changes, mirror it into the bridge
@@ -142,6 +149,12 @@ struct SlideshowPlaybackView: View {
             playbackBridge.currentTrackTitle = ""
             playbackBridge.currentTrackArtist = ""
             playbackBridge.isMusicPlaying = false
+
+            playbackBridge.musicNextTrack = nil
+            playbackBridge.onClipModeChanged = nil
+
+            // Clear mirrored state so the sidebar doesn't show stale info
+            playbackBridge.currentSlideIndex = 0
         }
         .focusable()
         .focused($isFocused)

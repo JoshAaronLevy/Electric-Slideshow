@@ -25,6 +25,7 @@ final class SlideshowPlaybackViewModel: ObservableObject {
     private let spotifyAPIService: SpotifyAPIService?
     private let playlistsStore: PlaylistsStore?
     private var playbackIndices: [Int] = []
+    private var musicClipMode: MusicClipMode = .fullSong
     
     var currentImage: NSImage? {
         guard currentIndex < loadedImages.count else { return nil }
@@ -75,6 +76,16 @@ final class SlideshowPlaybackViewModel: ObservableObject {
         stopSlideTimer()
         stopPlaybackStateMonitoring()
         await stopMusic()
+    }
+
+    // MARK: - Music clip mode
+
+    /// Updates the current clip mode used for music playback.
+    /// Stage 1: this just stores the value; actual behavior will come later.
+    func updateClipMode(_ mode: MusicClipMode) {
+        musicClipMode = mode
+        // Stage 1: No behavior change yet.
+        // In Stage 2, we'll use this to control timers / seek logic.
     }
     
     // MARK: - Image Loading

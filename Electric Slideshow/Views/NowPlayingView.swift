@@ -206,6 +206,20 @@ private struct NowPlayingSidebarView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
 
+                // Clip length picker
+                Picker("Clip length", selection: Binding(
+                    get: { playbackBridge.clipMode },
+                    set: { newValue in
+                        playbackBridge.clipMode = newValue
+                        playbackBridge.onClipModeChanged?(newValue)
+                    }
+                )) {
+                    ForEach(MusicClipMode.allCases) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                }
+                .pickerStyle(.menu)
+
                 HStack(spacing: 12) {
                     // Previous track
                     Button {
@@ -216,7 +230,7 @@ private struct NowPlayingSidebarView: View {
                     }
                     .buttonStyle(.bordered)
 
-                    // Play / Pause music only (does NOT affect slideshow timer)
+                    // Play / Pause
                     Button {
                         playbackBridge.musicTogglePlayPause?()
                     } label: {
@@ -236,7 +250,6 @@ private struct NowPlayingSidebarView: View {
                     .buttonStyle(.bordered)
                 }
             }
-
             Spacer()
         }
         .padding(20)

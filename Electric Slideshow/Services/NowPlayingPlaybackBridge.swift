@@ -19,6 +19,11 @@ final class NowPlayingPlaybackBridge: ObservableObject {
     var musicTogglePlayPause: (() -> Void)?
     var musicNextTrack: (() -> Void)?
 
+    // MARK: - Mode / configuration callbacks
+
+    /// Called when the user changes the music clip mode in the UI.
+    var onClipModeChanged: ((MusicClipMode) -> Void)?
+
     // MARK: - Read-only state for UI
 
     /// Zero-based index of the current slide.
@@ -38,4 +43,9 @@ final class NowPlayingPlaybackBridge: ObservableObject {
 
     /// Whether Spotify is currently playing.
     @Published var isMusicPlaying: Bool = false
+
+    // MARK: - Playback configuration
+
+    /// Currently selected clip mode for music playback in Now Playing.
+    @Published var clipMode: MusicClipMode = .fullSong
 }
