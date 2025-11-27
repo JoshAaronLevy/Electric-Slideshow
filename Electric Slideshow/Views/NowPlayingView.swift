@@ -40,31 +40,37 @@ struct NowPlayingView: View {
     @ViewBuilder
     private var mainContent: some View {
         if let slideshow = nowPlayingStore.activeSlideshow {
-            SlideshowPlaybackView(
-                slideshow: slideshow,
-                photoService: photoService,
-                spotifyAPIService: spotifyAuthService.isAuthenticated ? spotifyAPIService : nil,
-                playlistsStore: playlistsStore,
-                onViewModelReady: { viewModel in
-                    // When the playback view comes to life, wire its controls to the bridge
-                    playbackBridge.goToPreviousSlide = {
-                        if viewModel.hasPreviousSlide {
-                            viewModel.previousSlide()
+            HStack(spacing: 0) {
+                // LEFT: Slideshow playback fills the remaining space
+                SlideshowPlaybackView(
+                    slideshow: slideshow,
+                    photoService: photoService,
+                    spotifyAPIService: spotifyAuthService.isAuthenticated ? spotifyAPIService : nil,
+                    playlistsStore: playlistsStore,
+                    onViewModelReady: { viewModel in
+                        // When the playback view comes to life, wire its controls to the bridge
+                        playbackBridge.goToPreviousSlide = {
+                            if viewModel.hasPreviousSlide {
+                                viewModel.previousSlide()
+                            }
+                        }
+
+                        playbackBridge.togglePlayPause = {
+                            viewModel.togglePlayPause()
+                        }
+
+                        playbackBridge.goToNextSlide = {
+                            if viewModel.hasNextSlide {
+                                viewModel.nextSlide()
+                            }
                         }
                     }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                    playbackBridge.togglePlayPause = {
-                        viewModel.togglePlayPause()
-                    }
-
-                    playbackBridge.goToNextSlide = {
-                        if viewModel.hasNextSlide {
-                            viewModel.nextSlide()
-                        }
-                    }
-                }
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // RIGHT: New sidebar (fixed width)
+                NowPlayingSidebarView(slideshow: slideshow)
+            }
         } else {
             // Empty state when nothing is playing
             ZStack {
@@ -79,6 +85,57 @@ struct NowPlayingView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+}
+
+/// Right-hand sidebar shown only in the Now Playing view.
+/// Stage 1: simple placeholder that shows slideshow info and a "Now Playing" label.
+private struct NowPlayingSidebarView: View {
+    let slideshow: Slideshow
+
+    @EnvironmentObject private var playbackBridge: NowPlayingPlaybackBridge
+
+    // You can tweak this later for design, but 280–320 is a good media-app width.
+    private let sidebarWidth: CGFloat = 300
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Header
+            Text("Now Playing")
+                .font(.title2)
+                .bold()
+
+            // Slideshow title
+            Text(slideshow.title)
+                .font(.headline)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+
+            Divider()
+
+            // Placeholder content for Stage 1
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Sidebar coming soon")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                Text("In the next stages, this panel will host slideshow controls, music controls, photo count, and track info.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+        }
+        .padding(20)
+        .frame(width: sidebarWidth)
+        .frame(maxHeight: .infinity, alignment: .topLeading)
+        .background(
+            // Slightly elevated panel look
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(nsColor: .controlBackgroundColor))
+                .shadow(radius: 2, x: 0, y: -1)
+        )
+        .padding(.leading, 12) // small gap from the slideshow content
     }
 }
 

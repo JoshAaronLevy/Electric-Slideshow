@@ -284,11 +284,18 @@ final class SlideshowPlaybackViewModel: ObservableObject {
 
         if !isRunning {
             do {
-                try workspace.launchApplication(at: appURL,
-                                                options: [.default],
-                                                configuration: [:])
+                // Launch Spotify **without** activating it (don’t steal focus)
+                try workspace.launchApplication(
+                    at: appURL,
+                    options: [.withoutActivation],
+                    configuration: [:]
+                )
+
                 // Give Spotify a brief moment to launch and register as a device
                 try await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
+
+                // Make sure Electric Slideshow stays / comes back to the front
+                NSApplication.shared.activate(ignoringOtherApps: true)
             } catch {
                 print("[SlideshowPlaybackViewModel] Failed to launch Spotify app: \(error)")
                 errorMessage = "Couldn’t open the Spotify app on this Mac."
