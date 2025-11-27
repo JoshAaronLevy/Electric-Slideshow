@@ -98,6 +98,33 @@ private struct NowPlayingSidebarView: View {
     // You can tweak this later for design, but 280–320 is a good media-app width.
     private let sidebarWidth: CGFloat = 300
 
+    // MARK: - Derived display text
+
+    private var slidePositionText: String {
+        let total = playbackBridge.totalSlides
+        guard total > 0 else {
+            return "No photos loaded"
+        }
+
+        let current = min(max(playbackBridge.currentSlideIndex + 1, 1), total)
+        return "Photo \(current) of \(total)"
+    }
+
+    private var trackDisplayText: String {
+        let title = playbackBridge.currentTrackTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let artist = playbackBridge.currentTrackArtist.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !title.isEmpty else {
+            return "No track playing"
+        }
+
+        if artist.isEmpty {
+            return title
+        } else {
+            return "\(title) – \(artist)"
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             // MARK: - Slideshow section
@@ -111,6 +138,10 @@ private struct NowPlayingSidebarView: View {
                 Text(slideshow.title)
                     .font(.headline)
                     .lineLimit(2)
+                
+                Text(slidePositionText)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
 
                 // Slideshow transport controls
                 HStack(spacing: 16) {
@@ -153,10 +184,10 @@ private struct NowPlayingSidebarView: View {
                     .foregroundStyle(.secondary)
                     .textCase(.uppercase)
 
-                // Placeholder – in Stage 3 we'll show real track name + artist
-                Text("Spotify playback")
+                Text(trackDisplayText)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .lineLimit(2)
 
                 // Music transport controls
                 HStack(spacing: 16) {

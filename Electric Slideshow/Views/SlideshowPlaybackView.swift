@@ -70,9 +70,7 @@ struct SlideshowPlaybackView: View {
             // Let the parent know about our view model so it can bridge controls
             onViewModelReady?(viewModel)
 
-            // Also wire directly into the playbackBridge in case we ever want to
-            // use it from other contexts (not strictly required for Stage 3,
-            // but keeps things consistent).
+            // Wire commands into the playbackBridge
             playbackBridge.goToPreviousSlide = {
                 if viewModel.hasPreviousSlide {
                     viewModel.previousSlide()
@@ -105,6 +103,22 @@ struct SlideshowPlaybackView: View {
                     await viewModel.skipToNextTrack()
                 }
             }
+
+            // Seed the sidebar / bridge with the current state
+            syncPlaybackBridge()
+        }
+        // Whenever the slideshow or playback state changes, mirror it into the bridge
+        .onReceive(viewModel.$currentIndex) { _ in
+            syncPlaybackBridge()
+        }
+        .onReceive(viewModel.$loadedImages) { _ in
+            syncPlaybackBridge()
+        }
+        .onReceive(viewModel.$isPlaying) { _ in
+            syncPlaybackBridge()
+        }
+        .onReceive(viewModel.$currentPlaybackState) { _ in
+            syncPlaybackBridge()
         }
         .onDisappear {
             // Stop playback as before
@@ -117,10 +131,17 @@ struct SlideshowPlaybackView: View {
             playbackBridge.togglePlayPause = nil
             playbackBridge.goToNextSlide = nil
 
-            // Clear music commands
             playbackBridge.musicPreviousTrack = nil
             playbackBridge.musicTogglePlayPause = nil
             playbackBridge.musicNextTrack = nil
+
+            // Clear mirrored state so the sidebar doesn't show stale info
+            playbackBridge.currentSlideIndex = 0
+            playbackBridge.totalSlides = 0
+            playbackBridge.isSlideshowPlaying = false
+            playbackBridge.currentTrackTitle = ""
+            playbackBridge.currentTrackArtist = ""
+            playbackBridge.isMusicPlaying = false
         }
         .focusable()
         .focused($isFocused)
@@ -163,5 +184,28 @@ struct SlideshowPlaybackView: View {
             Text(viewModel.errorMessage ?? "Unable to start music playback. Make sure Spotify is open on this device.")
         }
         .background(Color.black.ignoresSafeArea())
+    }
+    
+    // MARK: - Bridge state syncing
+
+    /// Mirror the current slideshow + music state into the NowPlayingPlaybackBridge
+    /// so that other views (like the sidebar) can display it.
+    private func syncPlaybackBridge() {
+        // Slides
+        playbackBridge.currentSlideIndex = viewModel.currentIndex
+        playbackBridge.totalSlides = viewModel.loadedImages.count
+        playbackBridge.isSlideshowPlaying = viewModel.isPlaying
+
+        // Music / Spotify
+        if let playback = viewModel.currentPlaybackState,
+           let track = playback.item {
+            playbackBridge.currentTrackTitle = track.name
+            playbackBridge.currentTrackArtist = track.artists.first?.name ?? ""
+            playbackBridge.isMusicPlaying = playback.isPlaying
+        } else {
+            playbackBridge.currentTrackTitle = ""
+            playbackBridge.currentTrackArtist = ""
+            playbackBridge.isMusicPlaying = false
+        }
     }
 }
