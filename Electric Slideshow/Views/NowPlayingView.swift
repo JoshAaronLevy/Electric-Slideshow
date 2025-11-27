@@ -89,7 +89,7 @@ struct NowPlayingView: View {
 }
 
 /// Right-hand sidebar shown only in the Now Playing view.
-/// Stage 2: hosts slideshow + music controls (wired via NowPlayingPlaybackBridge).
+/// Stage 4: visually polished media controls with dynamic play/pause icons.
 private struct NowPlayingSidebarView: View {
     let slideshow: Slideshow
 
@@ -98,7 +98,19 @@ private struct NowPlayingSidebarView: View {
     // You can tweak this later for design, but 280–320 is a good media-app width.
     private let sidebarWidth: CGFloat = 300
 
-    // MARK: - Derived display text
+    // MARK: - Derived state
+
+    private var hasSlides: Bool {
+        playbackBridge.totalSlides > 0
+    }
+
+    private var slideshowPlayPauseIconName: String {
+        playbackBridge.isSlideshowPlaying ? "pause.fill" : "play.fill"
+    }
+
+    private var musicPlayPauseIconName: String {
+        playbackBridge.isMusicPlaying ? "pause.fill" : "play.fill"
+    }
 
     private var slidePositionText: String {
         let total = playbackBridge.totalSlides
@@ -125,11 +137,13 @@ private struct NowPlayingSidebarView: View {
         }
     }
 
+    // MARK: - Body
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             // MARK: - Slideshow section
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 Text("Slideshow")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -138,39 +152,42 @@ private struct NowPlayingSidebarView: View {
                 Text(slideshow.title)
                     .font(.headline)
                     .lineLimit(2)
-                
+
                 Text(slidePositionText)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
-                // Slideshow transport controls
-                HStack(spacing: 16) {
+                HStack(spacing: 12) {
                     // Previous slide
                     Button {
                         playbackBridge.goToPreviousSlide?()
                     } label: {
                         Image(systemName: "backward.end.fill")
-                            .imageScale(.large)
+                            .font(.title2)
                     }
                     .buttonStyle(.bordered)
+                    .disabled(!hasSlides)
 
                     // Play / Pause slideshow
                     Button {
                         playbackBridge.togglePlayPause?()
                     } label: {
-                        Image(systemName: "playpause.fill")
-                            .imageScale(.large)
+                        Image(systemName: slideshowPlayPauseIconName)
+                            .font(.title2)
                     }
                     .buttonStyle(.borderedProminent)
+                    .tint(playbackBridge.isSlideshowPlaying ? .accentColor : .primary)
+                    .disabled(!hasSlides)
 
                     // Next slide
                     Button {
                         playbackBridge.goToNextSlide?()
                     } label: {
                         Image(systemName: "forward.end.fill")
-                            .imageScale(.large)
+                            .font(.title2)
                     }
                     .buttonStyle(.bordered)
+                    .disabled(!hasSlides)
                 }
             }
 
@@ -178,7 +195,7 @@ private struct NowPlayingSidebarView: View {
 
             // MARK: - Music section
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 Text("Music")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -189,14 +206,13 @@ private struct NowPlayingSidebarView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
 
-                // Music transport controls
-                HStack(spacing: 16) {
+                HStack(spacing: 12) {
                     // Previous track
                     Button {
                         playbackBridge.musicPreviousTrack?()
                     } label: {
                         Image(systemName: "backward.fill")
-                            .imageScale(.large)
+                            .font(.title2)
                     }
                     .buttonStyle(.bordered)
 
@@ -204,17 +220,18 @@ private struct NowPlayingSidebarView: View {
                     Button {
                         playbackBridge.musicTogglePlayPause?()
                     } label: {
-                        Image(systemName: "playpause.fill")
-                            .imageScale(.large)
+                        Image(systemName: musicPlayPauseIconName)
+                            .font(.title2)
                     }
                     .buttonStyle(.borderedProminent)
+                    .tint(playbackBridge.isMusicPlaying ? .accentColor : .primary)
 
                     // Next track
                     Button {
                         playbackBridge.musicNextTrack?()
                     } label: {
                         Image(systemName: "forward.fill")
-                            .imageScale(.large)
+                            .font(.title2)
                     }
                     .buttonStyle(.bordered)
                 }
