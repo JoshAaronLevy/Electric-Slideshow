@@ -89,7 +89,7 @@ struct NowPlayingView: View {
 }
 
 /// Right-hand sidebar shown only in the Now Playing view.
-/// Stage 1: simple placeholder that shows slideshow info and a "Now Playing" label.
+/// Stage 2: hosts slideshow + music controls (wired via NowPlayingPlaybackBridge).
 private struct NowPlayingSidebarView: View {
     let slideshow: Slideshow
 
@@ -99,29 +99,94 @@ private struct NowPlayingSidebarView: View {
     private let sidebarWidth: CGFloat = 300
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Header
-            Text("Now Playing")
-                .font(.title2)
-                .bold()
+        VStack(alignment: .leading, spacing: 20) {
+            // MARK: - Slideshow section
 
-            // Slideshow title
-            Text(slideshow.title)
-                .font(.headline)
-                .lineLimit(2)
-                .multilineTextAlignment(.leading)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Slideshow")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+
+                Text(slideshow.title)
+                    .font(.headline)
+                    .lineLimit(2)
+
+                // Slideshow transport controls
+                HStack(spacing: 16) {
+                    // Previous slide
+                    Button {
+                        playbackBridge.goToPreviousSlide?()
+                    } label: {
+                        Image(systemName: "backward.end.fill")
+                            .imageScale(.large)
+                    }
+                    .buttonStyle(.bordered)
+
+                    // Play / Pause slideshow
+                    Button {
+                        playbackBridge.togglePlayPause?()
+                    } label: {
+                        Image(systemName: "playpause.fill")
+                            .imageScale(.large)
+                    }
+                    .buttonStyle(.borderedProminent)
+
+                    // Next slide
+                    Button {
+                        playbackBridge.goToNextSlide?()
+                    } label: {
+                        Image(systemName: "forward.end.fill")
+                            .imageScale(.large)
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
 
             Divider()
 
-            // Placeholder content for Stage 1
+            // MARK: - Music section
+
             VStack(alignment: .leading, spacing: 8) {
-                Text("Sidebar coming soon")
+                Text("Music")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+
+                // Placeholder – in Stage 3 we'll show real track name + artist
+                Text("Spotify playback")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
-                Text("In the next stages, this panel will host slideshow controls, music controls, photo count, and track info.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                // Music transport controls
+                HStack(spacing: 16) {
+                    // Previous track
+                    Button {
+                        playbackBridge.musicPreviousTrack?()
+                    } label: {
+                        Image(systemName: "backward.fill")
+                            .imageScale(.large)
+                    }
+                    .buttonStyle(.bordered)
+
+                    // Play / Pause music only (does NOT affect slideshow timer)
+                    Button {
+                        playbackBridge.musicTogglePlayPause?()
+                    } label: {
+                        Image(systemName: "playpause.fill")
+                            .imageScale(.large)
+                    }
+                    .buttonStyle(.borderedProminent)
+
+                    // Next track
+                    Button {
+                        playbackBridge.musicNextTrack?()
+                    } label: {
+                        Image(systemName: "forward.fill")
+                            .imageScale(.large)
+                    }
+                    .buttonStyle(.bordered)
+                }
             }
 
             Spacer()
@@ -139,103 +204,35 @@ private struct NowPlayingSidebarView: View {
     }
 }
 
-/// Bottom bar for slideshow + music controls.
-/// For Phase 3 this is primarily visual; we'll wire real actions later.
-private struct NowPlayingBottomBar: View {
+struct NowPlayingBottomBar: View {
     let slideshow: Slideshow?
-
-    @EnvironmentObject private var playbackBridge: NowPlayingPlaybackBridge
 
     var body: some View {
         ZStack {
-            // Simple toolbar-like background with a top divider
+            // Toolbar-like background with a top divider
             Color(nsColor: .windowBackgroundColor)
                 .overlay(
                     Divider(),
                     alignment: .top
                 )
 
-            HStack(spacing: 16) {
-                // Left: Slideshow controls
-                HStack(spacing: 12) {
-                    Button {
-                        playbackBridge.goToPreviousSlide?()
-                    } label: {
-                        Image(systemName: "backward.end.fill")
-                    }
-                    .buttonStyle(.plain)
-                    .opacity(0.6)
-
-                    Button {
-                        playbackBridge.togglePlayPause?()
-                    } label: {
-                        Image(systemName: "playpause.fill")
-                    }
-                    .buttonStyle(.plain)
-                    .opacity(0.6)
-
-                    Button {
-                        playbackBridge.goToNextSlide?()
-                    } label: {
-                        Image(systemName: "forward.end.fill")
-                    }
-                    .buttonStyle(.plain)
-                    .opacity(0.6)
-
-                    Divider()
-                        .frame(height: 24)
-
-                    if let slideshow {
-                        Text(slideshow.title)
-                            .font(.subheadline)
-                            .lineLimit(1)
-                    } else {
-                        Text("No slideshow")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
+            HStack {
+                // Left side: basic status
+                if let slideshow {
+                    Text("Now Playing: \(slideshow.title)")
+                        .font(.subheadline)
+                } else {
+                    Text("Nothing playing")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
 
                 Spacer()
 
-                // Right: Music / track controls
-                HStack(spacing: 12) {
-                    // Previous track
-                    Button {
-                        playbackBridge.musicPreviousTrack?()
-                    } label: {
-                        Image(systemName: "backward.fill")
-                    }
-                    .buttonStyle(.plain)
-                    .opacity(0.6)
-
-                    // Play/Pause music only (does NOT affect slideshow)
-                    Button {
-                        playbackBridge.musicTogglePlayPause?()
-                    } label: {
-                        Image(systemName: "playpause.fill")
-                    }
-                    .buttonStyle(.plain)
-                    .opacity(0.6)
-
-                    // Next track
-                    Button {
-                        playbackBridge.musicNextTrack?()
-                    } label: {
-                        Image(systemName: "forward.fill")
-                    }
-                    .buttonStyle(.plain)
-                    .opacity(0.6)
-
-                    Divider()
-                        .frame(height: 24)
-
-                    // Placeholder text – we can wire real track info later
-                    Text("Spotify")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
+                // Right side: hint that controls are in the sidebar
+                Text("Playback controls are in the sidebar →")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
             .padding(.horizontal, 20)
         }
