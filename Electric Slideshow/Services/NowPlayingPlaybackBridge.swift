@@ -47,5 +47,5 @@ final class NowPlayingPlaybackBridge: ObservableObject {
     // MARK: - Playback configuration
 
     /// Currently selected clip mode for music playback in Now Playing.
-    @Published var clipMode: MusicClipMode = .fullSong
+    @Published var clipMode: MusicClipMode = .seconds30
 }

@@ -1,5 +1,4 @@
 import Foundation
-import AppKit
 import Combine
 import Photos
 import AppKit
@@ -26,7 +25,7 @@ final class SlideshowPlaybackViewModel: ObservableObject {
     private let spotifyAPIService: SpotifyAPIService?
     private let playlistsStore: PlaylistsStore?
     private var playbackIndices: [Int] = []
-    private var musicClipMode: MusicClipMode = .fullSong
+    private var musicClipMode: MusicClipMode = .seconds30
     
     var currentImage: NSImage? {
         guard currentIndex < loadedImages.count else { return nil }
