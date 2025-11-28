@@ -157,6 +157,7 @@ struct SlideshowPlaybackView: View {
             playbackBridge.currentSlideIndex = 0
         }
         .focusable()
+        .focusEffectDisabled()
         .focused($isFocused)
         .onKeyPress(.space) {
             viewModel.togglePlayPause()

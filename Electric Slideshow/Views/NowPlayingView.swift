@@ -66,6 +66,7 @@ struct NowPlayingView: View {
                         }
                     }
                 )
+                .focusable(false)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 // RIGHT: New sidebar (fixed width)
