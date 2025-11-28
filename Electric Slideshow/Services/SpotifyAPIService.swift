@@ -319,6 +319,40 @@ final class SpotifyAPIService: ObservableObject {
             throw APIError.playbackFailed
         }
     }
+
+    /// Seeks the current track to the given position (in milliseconds).
+    func seekToPosition(positionMs: Int) async throws {
+        // Build URL: /me/player/seek?position_ms=...
+        var components = URLComponents(
+            url: baseURL.appendingPathComponent("me/player/seek"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "position_ms", value: "\(positionMs)")
+        ]
+
+        guard let url = components.url else {
+            throw APIError.playbackFailed
+        }
+
+        let token = try await authService.getValidAccessToken()
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.playbackFailed
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let errorBody = String(data: data, encoding: .utf8) ?? "(no body)"
+            print("[SpotifyAPI] ERROR: Seek failed with \(httpResponse.statusCode): \(errorBody)")
+            throw APIError.playbackFailed
+        }
+    }
     
     func skipToNext() async throws {
         let url = baseURL.appendingPathComponent("me/player/next")

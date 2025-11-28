@@ -102,23 +102,12 @@ final class SlideshowPlaybackViewModel: ObservableObject {
         }
     }
 
-    /// Cancels any existing music clip timer.
-    private func stopMusicClipTimer() {
-        musicClipTimer?.invalidate()
-        musicClipTimer = nil
-    }
-
-    /// Starts or restarts the timer that will advance to the next track
-    /// after the configured clip duration. If the mode is `.fullSong`, no timer is scheduled.
-    private func resetMusicClipTimerForCurrentTrack() {
-        // Always clear previous timer
+    /// Starts the clip timer for the given duration (in seconds).
+    private func startMusicClipTimer(duration: TimeInterval) {
         stopMusicClipTimer()
 
-        // Only schedule if we have a finite clip duration
-        guard let clipDuration = musicClipMode.clipDuration else { return }
-
         musicClipTimer = Timer.scheduledTimer(
-            withTimeInterval: clipDuration,
+            withTimeInterval: duration,
             repeats: false
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
@@ -127,6 +116,77 @@ final class SlideshowPlaybackViewModel: ObservableObject {
                 await self.skipToNextTrack()
                 // And arm the timer again for the next track
                 self.resetMusicClipTimerForCurrentTrack()
+            }
+        }
+    }
+
+    /// Cancels any existing music clip timer.
+    private func stopMusicClipTimer() {
+        musicClipTimer?.invalidate()
+        musicClipTimer = nil
+    }
+
+    /// Starts or restarts the timer that will advance to the next track
+    /// after the configured clip duration. If the mode is `.fullSong`, no timer is scheduled.
+    /// For `.seconds60`, the clip starts at a random point in the song.
+    private func resetMusicClipTimerForCurrentTrack() {
+        stopMusicClipTimer()
+
+        // Only schedule if we have a finite clip duration
+        guard let clipDuration = musicClipMode.clipDuration else {
+            return // Full song → no timer, no seek
+        }
+
+        // Capture current mode and duration at this moment (in case user changes it later)
+        let modeAtScheduling = musicClipMode
+
+        // If we don't have a Spotify service, just behave like "start from 0, run for duration"
+        guard let apiService = spotifyAPIService else {
+            startMusicClipTimer(duration: clipDuration)
+            return
+        }
+
+        Task { [weak self] in
+            guard let self else { return }
+
+            // Default behavior: start at 0 unless we can randomize
+            var startMs = 0
+
+            // We only randomize for the 60-second clip mode (per your spec).
+            if modeAtScheduling == .seconds60 || modeAtScheduling == .seconds30 {
+                do {
+                    // Get current playback state (includes the active track and its duration)
+                    if let state = try await apiService.getCurrentPlaybackState(),
+                       let track = state.item {
+
+                        let durationMs = track.durationMs
+                        let clipMs = Int(clipDuration * 1000)
+
+                        if durationMs > clipMs {
+                            let maxStart = durationMs - clipMs
+                            startMs = Int.random(in: 0...maxStart)
+                        } else {
+                            // Track is shorter than the clip → just start at 0
+                            startMs = 0
+                        }
+                    }
+                } catch {
+                    print("[SlideshowPlaybackViewModel] Failed to fetch playback state for random clip: \(error)")
+                }
+
+                do {
+                    // If we computed a non-zero start, seek into the track
+                    if startMs > 0 {
+                        try await apiService.seekToPosition(positionMs: startMs)
+                    }
+                } catch {
+                    print("[SlideshowPlaybackViewModel] Failed to seek for random clip: \(error)")
+                }
+            }
+
+            // Finally, arm the timer for this clip duration on the main actor
+            await MainActor.run {
+                self.startMusicClipTimer(duration: clipDuration)
             }
         }
     }
