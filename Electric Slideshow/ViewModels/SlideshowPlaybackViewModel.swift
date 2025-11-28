@@ -20,6 +20,7 @@ final class SlideshowPlaybackViewModel: ObservableObject {
     
     private var slideTimer: Timer?
     private var playbackCheckTimer: Timer?
+    private var musicClipTimer: Timer?
     private let slideshow: Slideshow
     private let photoService: PhotoLibraryService
     private let spotifyAPIService: SpotifyAPIService?
@@ -75,19 +76,61 @@ final class SlideshowPlaybackViewModel: ObservableObject {
     func stopPlayback() async {
         stopSlideTimer()
         stopPlaybackStateMonitoring()
+        stopMusicClipTimer()
         await stopMusic()
     }
 
     // MARK: - Music clip mode
 
     /// Updates the current clip mode used for music playback.
-    /// Stage 1: this just stores the value; actual behavior will come later.
+    /// Stage 2: stores the value and updates any active clip timer.
     func updateClipMode(_ mode: MusicClipMode) {
         musicClipMode = mode
-        // Stage 1: No behavior change yet.
-        // In Stage 2, we'll use this to control timers / seek logic.
+
+        // If we're in full-song mode, cancel any existing timer.
+        guard musicClipMode.clipDuration != nil else {
+            stopMusicClipTimer()
+            return
+        }
+
+        // Only (re)start the timer if music is currently playing.
+        if currentPlaybackState?.isPlaying == true {
+            resetMusicClipTimerForCurrentTrack()
+        } else {
+            // No active playback → no timer.
+            stopMusicClipTimer()
+        }
     }
-    
+
+    /// Cancels any existing music clip timer.
+    private func stopMusicClipTimer() {
+        musicClipTimer?.invalidate()
+        musicClipTimer = nil
+    }
+
+    /// Starts or restarts the timer that will advance to the next track
+    /// after the configured clip duration. If the mode is `.fullSong`, no timer is scheduled.
+    private func resetMusicClipTimerForCurrentTrack() {
+        // Always clear previous timer
+        stopMusicClipTimer()
+
+        // Only schedule if we have a finite clip duration
+        guard let clipDuration = musicClipMode.clipDuration else { return }
+
+        musicClipTimer = Timer.scheduledTimer(
+            withTimeInterval: clipDuration,
+            repeats: false
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                // After the clip window ends, move to the next track
+                await self.skipToNextTrack()
+                // And arm the timer again for the next track
+                self.resetMusicClipTimerForCurrentTrack()
+            }
+        }
+    }
+
     // MARK: - Image Loading
     
     private func loadAllImages() async {
@@ -238,6 +281,7 @@ final class SlideshowPlaybackViewModel: ObservableObject {
                 trackURIs: playlist.trackURIs,
                 deviceId: targetDevice.deviceId
             )
+            resetMusicClipTimerForCurrentTrack()
         } catch let playbackError as SpotifyAPIService.PlaybackError {
             switch playbackError {
             case .noActiveDevice(let message):
@@ -321,6 +365,8 @@ final class SlideshowPlaybackViewModel: ObservableObject {
     private func stopMusic() async {
         guard spotifyAPIService != nil else { return }
         
+        stopMusicClipTimer()
+
         do {
             try await spotifyAPIService?.pausePlayback()
         } catch {
@@ -336,6 +382,9 @@ final class SlideshowPlaybackViewModel: ObservableObject {
             return
         }
 
+        // Stop any active clip timer when pausing music
+        stopMusicClipTimer()
+
         Task {
             do {
                 try await apiService.pausePlayback()
@@ -346,7 +395,7 @@ final class SlideshowPlaybackViewModel: ObservableObject {
         }
     }
 
-    // Called when the slideshow is resumed by the user
+    // Called when the slideshow is resumed by the user (or music-only toggle is used)
     private func resumeMusicIfNeeded() {
         guard
             slideshow.settings.linkedPlaylistId != nil,
@@ -355,10 +404,14 @@ final class SlideshowPlaybackViewModel: ObservableObject {
             return
         }
 
-        Task {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+
             do {
                 // Resume playback from wherever Spotify left off
                 try await apiService.resumePlayback()
+                // Re-arm the clip timer if a clip mode is active
+                self.resetMusicClipTimerForCurrentTrack()
             } catch {
                 print("[SlideshowPlaybackViewModel] Failed to resume Spotify playback: \(error)")
             }
@@ -432,6 +485,8 @@ final class SlideshowPlaybackViewModel: ObservableObject {
         do {
             try await apiService.skipToNext()
             await checkPlaybackState()
+            // New track → restart the clip timer (if active)
+            resetMusicClipTimerForCurrentTrack()
         } catch {
             errorMessage = "Failed to skip track"
         }
@@ -443,6 +498,8 @@ final class SlideshowPlaybackViewModel: ObservableObject {
         do {
             try await apiService.skipToPrevious()
             await checkPlaybackState()
+            // New track → restart the clip timer (if active)
+            resetMusicClipTimerForCurrentTrack()
         } catch {
             errorMessage = "Failed to skip track"
         }
