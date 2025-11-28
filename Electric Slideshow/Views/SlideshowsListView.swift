@@ -23,10 +23,10 @@ struct SlideshowsListView: View {
     
     // 4-column grid layout
     private let columns = [
-        GridItem(.flexible(), spacing: 16),
-        GridItem(.flexible(), spacing: 16),
-        GridItem(.flexible(), spacing: 16),
-        GridItem(.flexible(), spacing: 16)
+        GridItem(.flexible(), spacing: 24),
+        GridItem(.flexible(), spacing: 24),
+        GridItem(.flexible(), spacing: 24),
+        GridItem(.flexible(), spacing: 24)
     ]
     
     var body: some View {
@@ -106,11 +106,76 @@ struct SlideshowsListView: View {
         .padding(24)
     }
     
+    // MARK: - Loading Skeleton View
+    
+    private var loadingSkeletonView: some View {
+        ScrollView {
+            LazyVGrid(columns: columns, spacing: 24) {
+                ForEach(0..<8) { _ in
+                    skeletonCardView
+                        .border(.red)
+                        .padding(8) // Add padding around each card to create visible spacing
+                }
+            }
+            .padding(32)
+        }
+    }
+    
+    private var skeletonCardView: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Skeleton thumbnail
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.gray.opacity(0.3))
+                .aspectRatio(16/9, contentMode: .fill)
+                .overlay(
+                    ProgressView()
+                        .scaleEffect(0.8)
+                )
+            
+            // Skeleton metadata
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(height: 16)
+                    
+                    Spacer()
+                    
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(width: 20, height: 20)
+                }
+                
+                HStack(spacing: 8) {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(width: 60, height: 12)
+                    
+                    Text("•")
+                        .foregroundStyle(.tertiary)
+                        .font(.caption)
+                    
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(width: 80, height: 12)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color(nsColor: .windowBackgroundColor))
+        )
+        .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
+    }
+    
     // MARK: - Grid View
     
     private var slideshowsGrid: some View {
         ScrollView {
-            LazyVGrid(columns: columns, spacing: 16) {
+            LazyVGrid(columns: columns, spacing: 24) {
                 ForEach(viewModel.slideshows) { slideshow in
                     SlideshowCardView(
                         slideshow: slideshow,
@@ -124,6 +189,7 @@ struct SlideshowsListView: View {
                             slideshowToDelete = slideshow
                         }
                     )
+                    .padding(8) // Add padding around each card to create visible spacing
                 }
             }
             .padding(24)
