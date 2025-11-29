@@ -225,17 +225,16 @@ private struct NowPlayingSidebarView: View {
                     }
                 }
             }
-            .padding(8)
+            .sidebarCardStyle()
             .background(
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: AppTheme.Sidebar.cornerRadius)
                     .fill(
                         playbackBridge.isMusicPlaying
                         ? Color.accentColor.opacity(0.12)
-                        : Color.clear
+                        : AppTheme.Sidebar.cardBackground
                     )
             )
             .overlay(alignment: .trailing) {
-                // Tiny "playing" indicator on the right when music is active
                 if playbackBridge.isMusicPlaying {
                     Image(systemName: "waveform")
                         .font(.caption)
@@ -273,11 +272,7 @@ private struct NowPlayingSidebarView: View {
                 .pickerStyle(.segmented)
                 .controlSize(.small)
             }
-            .padding(8)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.primary.opacity(0.04))
-            )
+            .sidebarCardStyle()
             .animation(.easeInOut(duration: 0.2), value: playbackBridge.clipMode)
 
             // Controls group: secondary transport row
@@ -290,16 +285,15 @@ private struct NowPlayingSidebarView: View {
 
             Spacer()
         }
-        .padding(20)
+        .padding(AppTheme.Sidebar.horizontalPadding)
         .frame(width: sidebarWidth)
         .frame(maxHeight: .infinity, alignment: .topLeading)
         .background(
-            // Slightly elevated panel look
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color(nsColor: .controlBackgroundColor))
+            RoundedRectangle(cornerRadius: AppTheme.Sidebar.cornerRadius)
+                .fill(AppTheme.Sidebar.panelBackground)
                 .shadow(radius: 2, x: 0, y: -1)
         )
-        .padding(.leading, 12) // small gap from the slideshow content
+        .padding(.leading, 12)
     }
 }
 
@@ -309,10 +303,7 @@ private struct SidebarSectionHeader: View {
 
     var body: some View {
         Text(title.uppercased())
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(.secondary)
-            .textCase(.uppercase)
-            .tracking(1) // slight letter spacing
+            .sidebarSectionHeaderStyle()
     }
 }
 
@@ -357,12 +348,7 @@ private struct SlideshowTransportControlsRow: View {
             .controlSize(.large)
             .disabled(!hasNext)
         }
-        .padding(.horizontal, 2)
-        .padding(.vertical, 4)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(isHovering ? Color.primary.opacity(0.05) : .clear)
-        )
+        .sidebarHoverRow(isHovering: isHovering)
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovering = hovering
@@ -406,12 +392,7 @@ private struct MusicTransportControlsRow: View {
             .buttonStyle(.bordered)
             .controlSize(.regular)
         }
-        .padding(.horizontal, 2)
-        .padding(.vertical, 4)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(isHovering ? Color.primary.opacity(0.05) : .clear)
-        )
+        .sidebarHoverRow(isHovering: isHovering)
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovering = hovering
