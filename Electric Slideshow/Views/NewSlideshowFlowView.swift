@@ -23,7 +23,15 @@ struct NewSlideshowFlowView: View {
     init(photoService: PhotoLibraryService, editingSlideshow: Slideshow? = nil, onSave: @escaping (Slideshow) -> Void) {
         self.onSave = onSave
         self._viewModel = StateObject(wrappedValue: NewSlideshowViewModel(editingSlideshow: editingSlideshow))
-        self._photoLibraryVM = StateObject(wrappedValue: PhotoLibraryViewModel(photoService: photoService))
+        
+        // Pre-select existing photos when editing
+        let preselectedAssetIds: Set<String>
+        if let existingSlideshow = editingSlideshow {
+            preselectedAssetIds = Set(existingSlideshow.photos.map { $0.localIdentifier })
+        } else {
+            preselectedAssetIds = []
+        }
+        self._photoLibraryVM = StateObject(wrappedValue: PhotoLibraryViewModel(photoService: photoService, preselectedAssetIds: preselectedAssetIds))
         
         // Initialize music selection from editing slideshow
         if let playlistId = editingSlideshow?.settings.linkedPlaylistId {
@@ -79,7 +87,7 @@ struct NewSlideshowFlowView: View {
                 }
             }
         }
-        .frame(minWidth: 800, minHeight: 600)
+        .frame(minWidth: 950, minHeight: 600)
     }
     
     // MARK: - Settings Step

@@ -26,8 +26,9 @@ class PhotoLibraryViewModel: ObservableObject {
         selectedAssetIds.count
     }
     
-    init(photoService: PhotoLibraryService) {
+    init(photoService: PhotoLibraryService, preselectedAssetIds: Set<String> = []) {
         self.photoService = photoService
+        self.selectedAssetIds = preselectedAssetIds
     }
     
     /// Load all albums from the photo library
