@@ -141,73 +141,67 @@ private struct NowPlayingSidebarView: View {
     // MARK: - Body
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            // MARK: - Slideshow section
+        VStack(alignment: .leading, spacing: 24) {
+            // MARK: - SLIDESHOW
 
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Slideshow")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .textCase(.uppercase)
+            SidebarSectionHeader(title: "Slideshow")
 
+            // Info group: title + "Photo X of Y"
+            VStack(alignment: .leading, spacing: 4) {
                 Text(slideshow.title)
-                    .font(.headline)
+                    .font(.title3.weight(.semibold))
                     .lineLimit(2)
 
                 Text(slidePositionText)
-                    .font(.subheadline)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
+            }
 
-                HStack(spacing: 12) {
-                    // Previous slide
-                    Button {
-                        playbackBridge.goToPreviousSlide?()
-                    } label: {
-                        Image(systemName: "backward.end.fill")
-                            .font(.title2)
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(!hasSlides)
+            // Controls group: primary transport row
+            SlideshowTransportControlsRow(
+                isPlaying: playbackBridge.isSlideshowPlaying,
+                isEnabled: hasSlides,
+                onPrevious: { playbackBridge.goToPreviousSlide?() },
+                onPlayPause: { playbackBridge.togglePlayPause?() },
+                onNext: { playbackBridge.goToNextSlide?() }
+            )
 
-                    // Play / Pause slideshow
-                    Button {
-                        playbackBridge.togglePlayPause?()
-                    } label: {
-                        Image(systemName: slideshowPlayPauseIconName)
-                            .font(.title2)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(playbackBridge.isSlideshowPlaying ? .accentColor : .primary)
-                    .disabled(!hasSlides)
+            Divider()
+                .padding(.vertical, 4)
 
-                    // Next slide
-                    Button {
-                        playbackBridge.goToNextSlide?()
-                    } label: {
-                        Image(systemName: "forward.end.fill")
-                            .font(.title2)
+            // MARK: - MUSIC
+
+            SidebarSectionHeader(title: "Music")
+
+            // Info group: track title + artist (slightly different weights)
+            VStack(alignment: .leading, spacing: 4) {
+                let title = playbackBridge.currentTrackTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                let artist = playbackBridge.currentTrackArtist.trimmingCharacters(in: .whitespacesAndNewlines)
+
+                if title.isEmpty {
+                    Text("No track playing")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+
+                    if !artist.isEmpty {
+                        Text(artist)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
-                    .buttonStyle(.bordered)
-                    .disabled(!hasSlides)
                 }
             }
 
-            Divider()
-
-            // MARK: - Music section
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Music")
+            // Clip length control (kept close to the track info)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Clip length")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .textCase(.uppercase)
 
-                Text(trackDisplayText)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-
-                // Clip length picker
                 Picker("Clip length", selection: Binding(
                     get: { playbackBridge.clipMode },
                     set: { newValue in
@@ -220,37 +214,17 @@ private struct NowPlayingSidebarView: View {
                     }
                 }
                 .pickerStyle(.menu)
-
-                HStack(spacing: 12) {
-                    // Previous track
-                    Button {
-                        playbackBridge.musicPreviousTrack?()
-                    } label: {
-                        Image(systemName: "backward.fill")
-                            .font(.title2)
-                    }
-                    .buttonStyle(.bordered)
-
-                    // Play / Pause
-                    Button {
-                        playbackBridge.musicTogglePlayPause?()
-                    } label: {
-                        Image(systemName: musicPlayPauseIconName)
-                            .font(.title2)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(playbackBridge.isMusicPlaying ? .accentColor : .primary)
-
-                    // Next track
-                    Button {
-                        playbackBridge.musicNextTrack?()
-                    } label: {
-                        Image(systemName: "forward.fill")
-                            .font(.title2)
-                    }
-                    .buttonStyle(.bordered)
-                }
+                .frame(maxWidth: 180, alignment: .leading)
             }
+
+            // Controls group: secondary transport row
+            MusicTransportControlsRow(
+                isPlaying: playbackBridge.isMusicPlaying,
+                onPrevious: { playbackBridge.musicPreviousTrack?() },
+                onPlayPause: { playbackBridge.musicTogglePlayPause?() },
+                onNext: { playbackBridge.musicNextTrack?() }
+            )
+
             Spacer()
         }
         .padding(20)
@@ -263,6 +237,93 @@ private struct NowPlayingSidebarView: View {
                 .shadow(radius: 2, x: 0, y: -1)
         )
         .padding(.leading, 12) // small gap from the slideshow content
+    }
+}
+
+// Small, reusable "SLIDESHOW" / "MUSIC" style label
+private struct SidebarSectionHeader: View {
+    let title: String
+
+    var body: some View {
+        Text(title.uppercased())
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .textCase(.uppercase)
+            .tracking(1) // slight letter spacing
+    }
+}
+
+// Primary "media transport" row – used for the slideshow
+private struct SlideshowTransportControlsRow: View {
+    let isPlaying: Bool
+    let isEnabled: Bool
+    let onPrevious: () -> Void
+    let onPlayPause: () -> Void
+    let onNext: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button(action: onPrevious) {
+                Image(systemName: "backward.end.fill")
+                    .font(.title2)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .disabled(!isEnabled)
+
+            Button(action: onPlayPause) {
+                Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                    .font(.title)
+                    .frame(minWidth: 32, minHeight: 32)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .tint(isPlaying ? .accentColor : .primary)
+            .disabled(!isEnabled)
+
+            Button(action: onNext) {
+                Image(systemName: "forward.end.fill")
+                    .font(.title2)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .disabled(!isEnabled)
+        }
+    }
+}
+
+// Secondary transport row – visually lighter, used for music
+private struct MusicTransportControlsRow: View {
+    let isPlaying: Bool
+    let onPrevious: () -> Void
+    let onPlayPause: () -> Void
+    let onNext: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button(action: onPrevious) {
+                Image(systemName: "backward.fill")
+                    .font(.title3)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.regular)
+
+            Button(action: onPlayPause) {
+                Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                    .font(.title3)
+                    .frame(minWidth: 28, minHeight: 28)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.regular)
+            .tint(isPlaying ? .accentColor : .primary)
+
+            Button(action: onNext) {
+                Image(systemName: "forward.fill")
+                    .font(.title3)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.regular)
+        }
     }
 }
 
