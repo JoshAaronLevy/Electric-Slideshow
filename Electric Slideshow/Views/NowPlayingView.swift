@@ -123,6 +123,16 @@ private struct NowPlayingSidebarView: View {
         return "Photo \(current) of \(total)"
     }
 
+    private var hasPreviousSlide: Bool {
+        guard hasSlides else { return false }
+        return playbackBridge.currentSlideIndex > 0
+    }
+
+    private var hasNextSlide: Bool {
+        guard hasSlides else { return false }
+        return playbackBridge.currentSlideIndex < max(0, playbackBridge.totalSlides - 1)
+    }
+
     private var trackDisplayText: String {
         let title = playbackBridge.currentTrackTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         let artist = playbackBridge.currentTrackArtist.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -160,7 +170,8 @@ private struct NowPlayingSidebarView: View {
             // Controls group: primary transport row
             SlideshowTransportControlsRow(
                 isPlaying: playbackBridge.isSlideshowPlaying,
-                isEnabled: hasSlides,
+                hasPrevious: hasPreviousSlide,
+                hasNext: hasNextSlide,
                 onPrevious: { playbackBridge.goToPreviousSlide?() },
                 onPlayPause: { playbackBridge.togglePlayPause?() },
                 onNext: { playbackBridge.goToNextSlide?() }
@@ -195,6 +206,25 @@ private struct NowPlayingSidebarView: View {
                     }
                 }
             }
+            .padding(8)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(
+                        playbackBridge.isMusicPlaying
+                        ? Color.accentColor.opacity(0.12)
+                        : Color.clear
+                    )
+            )
+            .overlay(alignment: .trailing) {
+                // Tiny "playing" indicator on the right when music is active
+                if playbackBridge.isMusicPlaying {
+                    Image(systemName: "waveform")
+                        .font(.caption)
+                        .foregroundStyle(Color.accentColor)
+                        .padding(.trailing, 6)
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: playbackBridge.isMusicPlaying)
 
             // Clip length control (kept close to the track info)
             VStack(alignment: .leading, spacing: 4) {
@@ -256,39 +286,56 @@ private struct SidebarSectionHeader: View {
 // Primary "media transport" row – used for the slideshow
 private struct SlideshowTransportControlsRow: View {
     let isPlaying: Bool
-    let isEnabled: Bool
+    let hasPrevious: Bool
+    let hasNext: Bool
     let onPrevious: () -> Void
     let onPlayPause: () -> Void
     let onNext: () -> Void
+
+    @State private var isHovering = false
 
     var body: some View {
         HStack(spacing: 12) {
             Button(action: onPrevious) {
                 Image(systemName: "backward.end.fill")
                     .font(.title2)
+                    .opacity(hasPrevious ? 1.0 : 0.35)
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
-            .disabled(!isEnabled)
+            .disabled(!hasPrevious)
 
             Button(action: onPlayPause) {
                 Image(systemName: isPlaying ? "pause.fill" : "play.fill")
                     .font(.title)
-                    .frame(minWidth: 32, minHeight: 32)
+                    .frame(minWidth: 34, minHeight: 34)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
-            .tint(isPlaying ? .accentColor : .primary)
-            .disabled(!isEnabled)
+            .tint(isPlaying ? .accentColor : .primary) // “alive” vs calm
+            .disabled(!hasPrevious && !hasNext)        // no slides at all
 
             Button(action: onNext) {
                 Image(systemName: "forward.end.fill")
                     .font(.title2)
+                    .opacity(hasNext ? 1.0 : 0.35)
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
-            .disabled(!isEnabled)
+            .disabled(!hasNext)
         }
+        .padding(.horizontal, 2)
+        .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isHovering ? Color.primary.opacity(0.05) : .clear)
+        )
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovering = hovering
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: isPlaying)
     }
 }
 
@@ -298,6 +345,8 @@ private struct MusicTransportControlsRow: View {
     let onPrevious: () -> Void
     let onPlayPause: () -> Void
     let onNext: () -> Void
+
+    @State private var isHovering = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -324,6 +373,18 @@ private struct MusicTransportControlsRow: View {
             .buttonStyle(.bordered)
             .controlSize(.regular)
         }
+        .padding(.horizontal, 2)
+        .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isHovering ? Color.primary.opacity(0.05) : .clear)
+        )
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovering = hovering
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: isPlaying)
     }
 }
 

@@ -1,0 +1,107 @@
+/Users/joshlevy/Desktop/Electric Slideshow
+├── CHANGELOG.md
+├── Electric Slideshow
+|  ├── Assets.xcassets
+|  |  ├── AccentColor.colorset
+|  |  |  └── Contents.json
+|  |  ├── AppIcon.appiconset
+|  |  |  ├── Contents.json
+|  |  |  ├── Electric-Slideshow_1024x1024.png
+|  |  |  ├── Electric-Slideshow_128x128.png
+|  |  |  ├── Electric-Slideshow_16x16.png
+|  |  |  ├── Electric-Slideshow_256x256.png
+|  |  |  ├── Electric-Slideshow_32x32.png
+|  |  |  ├── Electric-Slideshow_512x512.png
+|  |  |  └── Electric-Slideshow_64x64.png
+|  |  ├── AppLogo.imageset
+|  |  |  ├── AppLogo.png
+|  |  |  └── Contents.json
+|  |  └── Contents.json
+|  ├── Config
+|  |  ├── MusicClipMode.swift
+|  |  └── SpotifyConfig.swift
+|  ├── ContentView.swift
+|  ├── Electric_Slideshow.entitlements
+|  ├── Electric_SlideshowApp.swift
+|  ├── Extensions
+|  |  └── Color+App.swift
+|  ├── Helpers
+|  |  ├── ImageSize.swift
+|  |  └── PKCEHelper.swift
+|  ├── Models
+|  |  ├── Album.swift
+|  |  ├── AppPlaylist.swift
+|  |  ├── AppSection.swift
+|  |  ├── PhotoAsset.swift
+|  |  ├── PhotoLibraryError.swift
+|  |  ├── Slideshow.swift
+|  |  ├── SlideshowPhoto.swift
+|  |  ├── SlideshowSettings.swift
+|  |  ├── SpotifyAuthToken.swift
+|  |  ├── SpotifyPlaybackState.swift
+|  |  ├── SpotifyPlaylist.swift
+|  |  ├── SpotifyTrack.swift
+|  |  └── SpotifyUser.swift
+|  ├── Services
+|  |  ├── KeychainService.swift
+|  |  ├── NowPlayingPlaybackBridge.swift
+|  |  ├── NowPlayingStore.swift
+|  |  ├── PhotoLibraryService.swift
+|  |  ├── PlaylistsStore.swift
+|  |  ├── SlideshowsStore.swift
+|  |  ├── SpotifyAPIService.swift
+|  |  └── SpotifyAuthService.swift
+|  ├── ViewModels
+|  |  ├── AlbumListViewModel.swift
+|  |  ├── MusicLibraryViewModel.swift
+|  |  ├── MusicViewModel.swift
+|  |  ├── NewPlaylistViewModel.swift
+|  |  ├── NewSlideshowViewModel.swift
+|  |  ├── PermissionViewModel.swift
+|  |  ├── PhotoGridViewModel.swift
+|  |  ├── PhotoLibraryViewModel.swift
+|  |  ├── SlideshowPlaybackViewModel.swift
+|  |  ├── SlideshowsListViewModel.swift
+|  |  └── SpotifyDevicesViewModel.swift
+|  └── Views
+|     ├── AlbumListView.swift
+|     ├── AppMainView.swift
+|     ├── AppNavigationBar.swift
+|     ├── AppShellView.swift
+|     ├── MusicView.swift
+|     ├── NewPlaylistFlowView.swift
+|     ├── NewSlideshowFlowView.swift
+|     ├── NowPlayingView.swift
+|     ├── PhotoDetailView.swift
+|     ├── PhotoGridView.swift
+|     ├── PhotoSelectionView.swift
+|     ├── PlaceholderViews.swift
+|     ├── SettingsDashboardView.swift
+|     ├── SlideshowCardView.swift
+|     ├── SlideshowPlaybackView.swift
+|     ├── SlideshowsListView.swift
+|     ├── SpotifyDevicesSheetView.swift
+|     ├── TrackSelectionView.swift
+|     └── UserProfileModal.swift
+├── Electric Slideshow.xcodeproj
+|  ├── project.pbxproj
+|  ├── project.xcworkspace
+|  |  ├── contents.xcworkspacedata
+|  |  ├── xcshareddata
+|  |  |  └── swiftpm
+|  |  |     └── configuration
+|  |  └── xcuserdata
+|  |     ├── joshlevy.xcuserdatad
+|  |     |  └── UserInterfaceState.xcuserstate
+|  |     └── joshua.a.levy.xcuserdatad
+|  |        └── UserInterfaceState.xcuserstate
+|  └── xcuserdata
+|     ├── joshlevy.xcuserdatad
+|     |  └── xcschemes
+|     |     └── xcschememanagement.plist
+|     └── joshua.a.levy.xcuserdatad
+|        └── xcschemes
+|           └── xcschememanagement.plist
+├── Electric-Slideshow-Info.plist
+
+directory: 25 file: 79
