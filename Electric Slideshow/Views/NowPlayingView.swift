@@ -275,6 +275,26 @@ private struct NowPlayingSidebarView: View {
             .sidebarCardStyle()
             .animation(.easeInOut(duration: 0.2), value: playbackBridge.clipMode)
 
+            // Shuffle / Repeat controls
+            HStack(spacing: 12) {
+                SidebarToggleIconButton(
+                    systemName: "shuffle",
+                    label: "Shuffle",
+                    isActive: playbackBridge.isShuffleEnabled
+                ) {
+                    playbackBridge.toggleShuffle?()
+                }
+
+                SidebarToggleIconButton(
+                    systemName: "repeat",
+                    label: "Repeat",
+                    isActive: playbackBridge.isRepeatAllEnabled
+                ) {
+                    playbackBridge.toggleRepeatAll?()
+                }
+            }
+            .padding(.top, 4)
+
             // Controls group: secondary transport row
             MusicTransportControlsRow(
                 isPlaying: playbackBridge.isMusicPlaying,
@@ -294,6 +314,39 @@ private struct NowPlayingSidebarView: View {
                 .shadow(radius: 2, x: 0, y: -1)
         )
         .padding(.leading, 12)
+    }
+}
+
+private struct SidebarToggleIconButton: View {
+    let systemName: String
+    let label: String
+    let isActive: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: systemName)
+                Text(label)
+                    .font(.caption)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isActive ? Color.accentColor.opacity(0.15) : Color.clear)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(
+                        isActive ? Color.accentColor : Color.secondary.opacity(0.4),
+                        lineWidth: isActive ? 1.5 : 1
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(isActive ? Color.accentColor : Color.secondary)
+        .contentShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 

@@ -223,8 +223,6 @@ struct SlideshowPlaybackView: View {
         playbackBridge.currentSlideIndex = viewModel.currentIndex
         playbackBridge.totalSlides = viewModel.loadedImages.count
         playbackBridge.isSlideshowPlaying = viewModel.isPlaying
-        playbackBridge.isShuffleEnabled = viewModel.isShuffleEnabled
-        playbackBridge.isRepeatAllEnabled = (viewModel.repeatMode == .all)
 
         // Music / normalized playback state
         let state = viewModel.normalizedPlaybackState
@@ -238,5 +236,8 @@ struct SlideshowPlaybackView: View {
             playbackBridge.currentTrackArtist = ""
             playbackBridge.isMusicPlaying = false
         }
+
+        playbackBridge.isShuffleEnabled = viewModel.isShuffleEnabled
+        playbackBridge.isRepeatAllEnabled = (viewModel.repeatMode == .all)
     }
 }
