@@ -16,6 +16,7 @@ final class SlideshowPlaybackViewModel: ObservableObject {
     /// When true, the music error alert should offer a “Download Spotify” button
     /// rather than just “Continue without music”.
     @Published var requiresSpotifyAppInstall: Bool = false
+    @Published var normalizedPlaybackState: PlaybackState = .idle
     
     private var slideTimer: Timer?
     private var playbackCheckTimer: Timer?
@@ -512,10 +513,35 @@ final class SlideshowPlaybackViewModel: ObservableObject {
         guard let apiService = spotifyAPIService else { return }
         
         do {
-            currentPlaybackState = try await apiService.getCurrentPlaybackState()
+            let state = try await apiService.getCurrentPlaybackState()
+            currentPlaybackState = state
+            updateNormalizedPlaybackState(from: state)
         } catch {
             // Silently fail
         }
+    }
+
+    /// Maps the Spotify-specific playback state into our normalized PlaybackState
+    /// so the rest of the app doesn't need to know about Spotify's model.
+    private func updateNormalizedPlaybackState(from playback: SpotifyPlaybackState?) {
+        guard let playback, let track = playback.item else {
+            normalizedPlaybackState = .idle
+            return
+        }
+
+        // We don't have duration in SpotifyTrack uploaded here, so we use 0 for now.
+        // Once you expose duration on SpotifyTrack, plug it in below.
+        let durationMs = 0
+
+        normalizedPlaybackState = PlaybackState(
+            trackUri: nil,                    // You can wire a URI later if desired
+            trackName: track.name,
+            artistName: track.artists.first?.name,
+            positionMs: playback.progressMs ?? 0,
+            durationMs: durationMs,
+            isPlaying: playback.isPlaying,
+            isBuffering: false
+        )
     }
     
     // MARK: - Music Controls

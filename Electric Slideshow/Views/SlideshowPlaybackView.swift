@@ -210,20 +210,19 @@ struct SlideshowPlaybackView: View {
     
     // MARK: - Bridge state syncing
 
-    /// Mirror the current slideshow + music state into the NowPlayingPlaybackBridge
-    /// so that other views (like the sidebar) can display it.
     private func syncPlaybackBridge() {
-        // Slides
+        // Slideshow / image state
         playbackBridge.currentSlideIndex = viewModel.currentIndex
         playbackBridge.totalSlides = viewModel.loadedImages.count
         playbackBridge.isSlideshowPlaying = viewModel.isPlaying
 
-        // Music / Spotify
-        if let playback = viewModel.currentPlaybackState,
-           let track = playback.item {
-            playbackBridge.currentTrackTitle = track.name
-            playbackBridge.currentTrackArtist = track.artists.first?.name ?? ""
-            playbackBridge.isMusicPlaying = playback.isPlaying
+        // Music / normalized playback state
+        let state = viewModel.normalizedPlaybackState
+
+        if let title = state.trackName, !title.isEmpty {
+            playbackBridge.currentTrackTitle = title
+            playbackBridge.currentTrackArtist = state.artistName ?? ""
+            playbackBridge.isMusicPlaying = state.isPlaying
         } else {
             playbackBridge.currentTrackTitle = ""
             playbackBridge.currentTrackArtist = ""
