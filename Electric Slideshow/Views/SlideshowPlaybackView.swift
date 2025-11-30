@@ -15,9 +15,12 @@ struct SlideshowPlaybackView: View {
         playlistsStore: PlaylistsStore?,
         onViewModelReady: ((SlideshowPlaybackViewModel) -> Void)? = nil
     ) {
-        let backend: MusicPlaybackBackend? = spotifyAPIService.map {
-            SpotifyExternalPlaybackBackend(apiService: $0)
-        }
+        // Decide which backend to use for this session.
+        // Right now this uses the global default (external device).
+        let backend = PlaybackBackendFactory.makeBackend(
+            mode: PlaybackBackendFactory.defaultMode,
+            spotifyAPIService: spotifyAPIService
+        )
 
         _viewModel = StateObject(wrappedValue: SlideshowPlaybackViewModel(
             slideshow: slideshow,
