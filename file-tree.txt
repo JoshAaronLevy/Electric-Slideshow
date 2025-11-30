@@ -43,16 +43,22 @@
 |  |  ├── SpotifyPlaylist.swift
 |  |  ├── SpotifyTrack.swift
 |  |  └── SpotifyUser.swift
+|  ├── Resources
+|  |  └── internal_player.html
 |  ├── Services
+|  |  ├── InternalSpotifyPlayer.swift
 |  |  ├── KeychainService.swift
 |  |  ├── MusicPlaybackBackend.swift
 |  |  ├── NowPlayingPlaybackBridge.swift
 |  |  ├── NowPlayingStore.swift
 |  |  ├── PhotoLibraryService.swift
+|  |  ├── PlaybackBackendFactory.swift
 |  |  ├── PlaylistsStore.swift
 |  |  ├── SlideshowsStore.swift
 |  |  ├── SpotifyAPIService.swift
-|  |  └── SpotifyAuthService.swift
+|  |  ├── SpotifyAuthService.swift
+|  |  ├── SpotifyExternalPlaybackBackend.swift
+|  |  └── SpotifyInternalPlaybackBackend.swift
 |  ├── ViewModels
 |  |  ├── AlbumListViewModel.swift
 |  |  ├── MusicLibraryViewModel.swift

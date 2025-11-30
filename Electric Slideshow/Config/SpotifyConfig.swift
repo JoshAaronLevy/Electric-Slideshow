@@ -12,6 +12,7 @@ struct SpotifyConfig {
     static let redirectURI = "com.electricslideshow://callback"
     static let tokenExchangeURL = URL(string: "https://electric-slideshow-server.onrender.com/auth/spotify/token")!
     static let tokenRefreshURL = URL(string: "https://electric-slideshow-server.onrender.com/auth/spotify/refresh")!
+    static let internalPlayerURL = URL(string: "https://electric-slideshow-server.onrender.com/internal-player")!
     
     static let scopes = [
         "playlist-read-private",

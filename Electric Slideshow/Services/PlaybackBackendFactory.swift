@@ -47,7 +47,8 @@ struct PlaybackBackendFactory {
         case .internalWebPlayer:
             // Internal web player: runs the Spotify Web Playback SDK in a WKWebView.
             // Still experimental; commands are wired through InternalSpotifyPlayer.
-            return SpotifyInternalPlaybackBackend(apiService: apiService)
+            let internalPlayer = InternalSpotifyPlayer()
+            return SpotifyInternalPlaybackBackend(player: internalPlayer, apiService: apiService)
         }
     }
 }

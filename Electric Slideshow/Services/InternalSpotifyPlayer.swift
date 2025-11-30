@@ -14,14 +14,23 @@ import WebKit
 /// Simple event coming back from the internal player JS side.
 /// We'll expand this later once we wire the real Web Playback SDK.
 struct InternalPlayerEvent: Decodable {
-    enum EventType: String, Decodable {
-        case ready
-        case stateChanged
-        case error
-    }
+    let type: String
 
-    let type: EventType
+    // Optional generic message / error info
     let message: String?
+    let code: String?
+
+    // Device info
+    let deviceId: String?
+
+    // Playback state
+    let isPlaying: Bool?
+    let positionMs: Int?
+    let durationMs: Int?
+    let trackUri: String?
+    let trackName: String?
+    let artistName: String?
+    let albumName: String?
 }
 
 /// A small wrapper around WKWebView that will eventually host the
@@ -44,6 +53,10 @@ final class InternalSpotifyPlayer: NSObject, WKScriptMessageHandler {
         let contentController = WKUserContentController()
         let config = WKWebViewConfiguration()
         config.userContentController = contentController
+        // Allow JS audio playback without user interaction (macOS 12+)
+        if #available(macOS 12.0, *) {
+            config.mediaTypesRequiringUserActionForPlayback = []
+        }
 
         self.webView = WKWebView(frame: .zero, configuration: config)
 
@@ -150,42 +163,13 @@ final class InternalSpotifyPlayer: NSObject, WKScriptMessageHandler {
 
     // MARK: - Public API
 
-    /// Load the internal player HTML. For now we just load a trivial
-    /// inline HTML string that can call back into Swift.
-    ///
-    /// Later, this will:
-    ///  - load a bundled "internal_player.html"
-    ///  - initialize the Spotify Web Playback SDK
-    ///  - send rich events via the "playerEvent" message channel.
+    /// Load the internal player HTML from the app bundle.
+    /// This HTML defines window.INTERNAL_PLAYER and sets up the JS ↔ Swift bridge.
     func load() {
-        let html = """
-        <!doctype html>
-        <html>
-        <head><meta charset="UTF-8"><title>Internal Player</title></head>
-        <body>
-            <script>
-            // Minimal JS bridge. Later we'll replace this with the
-            // actual Spotify Web Playback SDK integration.
-
-            function notifyReady() {
-                try {
-                    window.webkit.messageHandlers.playerEvent.postMessage({
-                        type: "ready",
-                        message: "Internal player skeleton loaded"
-                    });
-                } catch (e) {
-                    console.error("Failed to post ready event", e);
-                }
-            }
-
-            // Auto-notify Swift that the skeleton has loaded.
-            window.onload = notifyReady;
-            </script>
-        </body>
-        </html>
-        """
-
-        webView.loadHTMLString(html, baseURL: nil)
+        let url = SpotifyConfig.internalPlayerURL
+        let request = URLRequest(url: url)
+        print("[InternalSpotifyPlayer] Loading internal player from \(url.absoluteString)")
+        webView.load(request)
     }
 
     /// Evaluate arbitrary JS in the web view. We'll use this later

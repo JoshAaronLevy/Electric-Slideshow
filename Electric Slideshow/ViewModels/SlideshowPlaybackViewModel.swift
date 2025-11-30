@@ -28,7 +28,7 @@ final class SlideshowPlaybackViewModel: ObservableObject {
     private let spotifyAPIService: SpotifyAPIService?
     private let playlistsStore: PlaylistsStore?
     private var playbackIndices: [Int] = []
-    private var musicClipMode: MusicClipMode = .seconds30
+    private var musicClipMode: MusicClipMode = .seconds60
     private let musicBackend: MusicPlaybackBackend?
     
     var currentImage: NSImage? {
@@ -188,8 +188,7 @@ final class SlideshowPlaybackViewModel: ObservableObject {
             // Default behavior: start at 0 unless we can randomize
             var startMs = 0
 
-            // We only randomize for the 60-second clip mode (per your spec).
-            if modeAtScheduling == .seconds60 || modeAtScheduling == .seconds30 {
+            if modeAtScheduling == .seconds30 || modeAtScheduling == .seconds45 || modeAtScheduling == .seconds60 {
                 do {
                     // Get current playback state (includes the active track and its duration)
                     if let state = try await apiService.getCurrentPlaybackState(),

@@ -19,47 +19,88 @@ final class SpotifyInternalPlaybackBackend: MusicPlaybackBackend {
 
     private(set) var isReady: Bool = false
 
-    // MARK: - Dependencies
-
     private let player: InternalSpotifyPlayer
-
     private let apiService: SpotifyAPIService
 
-    init(
-        apiService: SpotifyAPIService,
-        player: InternalSpotifyPlayer = InternalSpotifyPlayer()
-    ) {
-        self.apiService = apiService
+    init(player: InternalSpotifyPlayer, apiService: SpotifyAPIService) {
         self.player = player
+        self.apiService = apiService
 
-        // Wire player events into our callbacks.
         self.player.onEvent = { [weak self] event in
-            self?.handlePlayerEvent(event)
+            self?.handle(event: event)
         }
     }
 
     func initialize() {
-        // Load the skeleton HTML / JS bridge.
+        // Kick off HTML load
         player.load()
-
-        // Fetch a Web Playback-capable token and inject it into JS.
-        Task {
+        
+        // Fetch web playback token asynchronously
+        Task { @MainActor in
             do {
                 let token = try await apiService.getWebPlaybackAccessToken()
-                await MainActor.run {
-                    self.player.setAccessToken(token)
-                }
+                player.setAccessToken(token)
             } catch {
-                await MainActor.run {
-                    self.onError?(.backend(message: "Failed to fetch Web Playback token: \(error.localizedDescription)"))
-                }
+                let message = "Failed to get web playback token: \(error.localizedDescription)"
+                print("[SpotifyInternalPlaybackBackend] \(message)")
+                onError?(.backend(message: message))
             }
         }
     }
 
+    // MARK: - Event handling
+
+    private func handle(event: InternalPlayerEvent) {
+        switch event.type {
+        case "ready":
+            print("[SpotifyInternalPlaybackBackend] Internal player ready, deviceId=\(event.deviceId ?? "unknown")")
+            isReady = true
+
+        case "stateChanged":
+            guard
+                let isPlaying = event.isPlaying,
+                let positionMs = event.positionMs,
+                let durationMs = event.durationMs
+            else {
+                return
+            }
+
+            let state = PlaybackState(
+                trackUri: event.trackUri,
+                trackName: event.trackName,
+                artistName: event.artistName,
+                positionMs: positionMs,
+                durationMs: durationMs,
+                isPlaying: isPlaying,
+                isBuffering: false
+            )
+
+            // Push into the rest of the app (SlideshowPlaybackViewModel, NowPlaying, etc.)
+            onStateChanged?(state)
+
+        case "error":
+            let message = event.message ?? "Unknown internal player error"
+            print("[SpotifyInternalPlaybackBackend] error: \(event.code ?? "?") - \(message)")
+            onError?(.backend(message: message))
+
+        case "htmlLoaded", "tokenUpdated":
+            print("[SpotifyInternalPlaybackBackend] event: \(event.type)")
+
+        case "notReady":
+            print("[SpotifyInternalPlaybackBackend] Internal device offline: \(event.deviceId ?? "unknown")")
+            // You could emit an idle/paused state here if you want:
+            // onStateChanged?(.idle)
+
+        default:
+            print("[SpotifyInternalPlaybackBackend] Unhandled event type: \(event.type)")
+        }
+    }
+
+    // MARK: - MusicPlaybackBackend commands
+
     func playTrack(_ trackUri: String, startPositionMs: Int?) {
-        // For now we just call play() – later we'll wire trackUri + seek.
-        debugPrint("[SpotifyInternalPlaybackBackend] playTrack(uri: \(trackUri), startPositionMs: \(startPositionMs ?? 0))")
+        // For now, just resume whatever context the Web Playback SDK has.
+        // Later we'll wire trackUri + context properly.
         player.play()
     }
 
@@ -87,33 +128,12 @@ final class SpotifyInternalPlaybackBackend: MusicPlaybackBackend {
         player.setVolume(value)
     }
 
-    // MARK: - Private helpers
-
-    private func handlePlayerEvent(_ event: InternalPlayerEvent) {
-        switch event.type {
-        case .ready:
-            isReady = true
-            print("[SpotifyInternalPlaybackBackend] Internal player ready: \(event.message ?? "")")
-
-            // Emit an initial idle state to anyone listening.
-            onStateChanged?(.idle)
-
-        case .stateChanged:
-            // Once the JS side sends real playback state, this is where
-            // we'll map it into PlaybackState and call onStateChanged.
-            print("[SpotifyInternalPlaybackBackend] stateChanged: \(event.message ?? "")")
-
-        case .error:
-            print("[SpotifyInternalPlaybackBackend] error: \(event.message ?? "")")
-            onError?(.backend(message: event.message ?? "Internal player error"))
-        }
-    }
-
     func setShuffleEnabled(_ isOn: Bool) {
-        debugPrint("[SpotifyInternalPlaybackBackend] setShuffleEnabled(\(isOn)) – not implemented yet")
+        // We'll handle shuffle via the Web API or SDK later.
+        print("[SpotifyInternalPlaybackBackend] setShuffleEnabled(\(isOn)) – not wired yet")
     }
 
     func setRepeatMode(_ mode: PlaybackRepeatMode) {
-        debugPrint("[SpotifyInternalPlaybackBackend] setRepeatMode(\(mode)) – not implemented yet")
+        print("[SpotifyInternalPlaybackBackend] setRepeatMode(\(mode)) – not wired yet")
     }
 }
