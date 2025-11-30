@@ -66,6 +66,8 @@ final class SlideshowPlaybackViewModel: ObservableObject {
         self.spotifyAPIService = spotifyAPIService
         self.playlistsStore = playlistsStore
         self.musicBackend = musicBackend
+
+        setupMusicBackendCallbacks()
     }
     
     // MARK: - Lifecycle
@@ -105,6 +107,34 @@ final class SlideshowPlaybackViewModel: ObservableObject {
         } else {
             // No active playback → no timer.
             stopMusicClipTimer()
+        }
+    }
+
+    /// Connects the music backend's callbacks to this view model so that
+    /// backend-agnostic PlaybackState can drive the UI.
+    private func setupMusicBackendCallbacks() {
+        guard let backend = musicBackend else { return }
+
+        backend.onStateChanged = { [weak self] state in
+            // Ensure UI updates happen on main actor
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                self.normalizedPlaybackState = state
+            }
+        }
+
+        backend.onError = { [weak self] error in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+
+                // You can keep this as simple logging, or surface it via your
+                // existing error UI. Here's a minimal version:
+                print("[SlideshowPlaybackViewModel] Playback backend error: \(error)")
+
+                // Optional: hook into your music error UI if you want
+                // self.errorMessage = "Music playback error"
+                // self.showingMusicError = true
+            }
         }
     }
 
