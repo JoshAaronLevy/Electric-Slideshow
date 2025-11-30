@@ -24,6 +24,7 @@
 |  ├── Electric_Slideshow.entitlements
 |  ├── Electric_SlideshowApp.swift
 |  ├── Extensions
+|  |  ├── AppTheme.swift
 |  |  └── Color+App.swift
 |  ├── Helpers
 |  |  ├── ImageSize.swift
@@ -44,6 +45,7 @@
 |  |  └── SpotifyUser.swift
 |  ├── Services
 |  |  ├── KeychainService.swift
+|  |  ├── MusicPlaybackBackend.swift
 |  |  ├── NowPlayingPlaybackBridge.swift
 |  |  ├── NowPlayingStore.swift
 |  |  ├── PhotoLibraryService.swift
@@ -103,5 +105,3 @@
 |        └── xcschemes
 |           └── xcschememanagement.plist
 ├── Electric-Slideshow-Info.plist
-
-directory: 25 file: 79

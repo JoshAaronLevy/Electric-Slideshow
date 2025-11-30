@@ -15,15 +15,20 @@ struct SlideshowPlaybackView: View {
         playlistsStore: PlaylistsStore?,
         onViewModelReady: ((SlideshowPlaybackViewModel) -> Void)? = nil
     ) {
+        let backend: MusicPlaybackBackend? = spotifyAPIService.map {
+            SpotifyExternalPlaybackBackend(apiService: $0)
+        }
+
         _viewModel = StateObject(wrappedValue: SlideshowPlaybackViewModel(
             slideshow: slideshow,
             photoService: photoService,
             spotifyAPIService: spotifyAPIService,
-            playlistsStore: playlistsStore
+            playlistsStore: playlistsStore,
+            musicBackend: backend
         ))
         self.onViewModelReady = onViewModelReady
     }
-    
+
     var body: some View {
         ZStack {
             // Full-screen black background

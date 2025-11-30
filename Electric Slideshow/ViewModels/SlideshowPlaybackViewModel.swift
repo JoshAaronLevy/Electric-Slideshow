@@ -26,6 +26,7 @@ final class SlideshowPlaybackViewModel: ObservableObject {
     private let playlistsStore: PlaylistsStore?
     private var playbackIndices: [Int] = []
     private var musicClipMode: MusicClipMode = .seconds30
+    private let musicBackend: MusicPlaybackBackend?
     
     var currentImage: NSImage? {
         guard currentIndex < loadedImages.count else { return nil }
@@ -54,12 +55,14 @@ final class SlideshowPlaybackViewModel: ObservableObject {
         slideshow: Slideshow,
         photoService: PhotoLibraryService,
         spotifyAPIService: SpotifyAPIService? = nil,
-        playlistsStore: PlaylistsStore? = nil
+        playlistsStore: PlaylistsStore? = nil,
+        musicBackend: MusicPlaybackBackend? = nil
     ) {
         self.slideshow = slideshow
         self.photoService = photoService
         self.spotifyAPIService = spotifyAPIService
         self.playlistsStore = playlistsStore
+        self.musicBackend = musicBackend
     }
     
     // MARK: - Lifecycle
@@ -70,6 +73,7 @@ final class SlideshowPlaybackViewModel: ObservableObject {
         await startMusic()
         startSlideTimer()
         startPlaybackStateMonitoring()
+        musicBackend?.initialize()
     }
     
     func stopPlayback() async {
@@ -434,15 +438,20 @@ final class SlideshowPlaybackViewModel: ObservableObject {
     }
 
     private func pauseMusicIfNeeded() {
-        guard
-            slideshow.settings.linkedPlaylistId != nil,
-            let apiService = spotifyAPIService
-        else {
+        guard slideshow.settings.linkedPlaylistId != nil else {
             return
         }
 
         // Stop any active clip timer when pausing music
         stopMusicClipTimer()
+
+        if let backend = musicBackend {
+            backend.pause()
+            return
+        }
+
+        // Fallback: direct API call if no backend is present
+        guard let apiService = spotifyAPIService else { return }
 
         Task {
             do {
@@ -454,14 +463,21 @@ final class SlideshowPlaybackViewModel: ObservableObject {
         }
     }
 
-    // Called when the slideshow is resumed by the user (or music-only toggle is used)
     private func resumeMusicIfNeeded() {
-        guard
-            slideshow.settings.linkedPlaylistId != nil,
-            let apiService = spotifyAPIService
-        else {
+        guard slideshow.settings.linkedPlaylistId != nil else {
             return
         }
+
+        if let backend = musicBackend {
+            // Backend handles the async call; we just re-arm the clip timer
+            backend.resume()
+            // Re-arm the clip timer if a clip mode is active
+            resetMusicClipTimerForCurrentTrack()
+            return
+        }
+
+        // Fallback: direct API call if no backend is present
+        guard let apiService = spotifyAPIService else { return }
 
         Task { @MainActor [weak self] in
             guard let self else { return }
@@ -539,8 +555,15 @@ final class SlideshowPlaybackViewModel: ObservableObject {
     }
     
     func skipToNextTrack() async {
+        if let backend = musicBackend {
+            backend.nextTrack()
+            // New track → restart the clip timer (if active)
+            resetMusicClipTimerForCurrentTrack()
+            return
+        }
+
         guard let apiService = spotifyAPIService else { return }
-        
+
         do {
             try await apiService.skipToNext()
             await checkPlaybackState()
@@ -552,8 +575,15 @@ final class SlideshowPlaybackViewModel: ObservableObject {
     }
     
     func skipToPreviousTrack() async {
+        if let backend = musicBackend {
+            backend.previousTrack()
+            // New track → restart the clip timer (if active)
+            resetMusicClipTimerForCurrentTrack()
+            return
+        }
+
         guard let apiService = spotifyAPIService else { return }
-        
+
         do {
             try await apiService.skipToPrevious()
             await checkPlaybackState()
