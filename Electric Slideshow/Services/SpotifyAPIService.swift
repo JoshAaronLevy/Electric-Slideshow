@@ -10,6 +10,22 @@ final class SpotifyAPIService: ObservableObject {
     init(authService: SpotifyAuthService) {
         self.authService = authService
     }
+
+    // MARK: - Web Playback Token
+
+    /// Returns a Spotify access token suitable for use with the
+    /// Spotify Web Playback SDK on the JS side.
+    ///
+    /// For now this is just your regular access token; make sure
+    /// the app is authorized with the required scopes:
+    /// - streaming
+    /// - user-read-email
+    /// - user-read-private
+    /// - user-modify-playback-state
+    /// - user-read-playback-state
+    func getWebPlaybackAccessToken() async throws -> String {
+        return try await authService.getValidAccessToken()
+    }
     
     // MARK: - User Profile
     

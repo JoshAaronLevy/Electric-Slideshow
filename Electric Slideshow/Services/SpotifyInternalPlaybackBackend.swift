@@ -23,7 +23,13 @@ final class SpotifyInternalPlaybackBackend: MusicPlaybackBackend {
 
     private let player: InternalSpotifyPlayer
 
-    init(player: InternalSpotifyPlayer = InternalSpotifyPlayer()) {
+    private let apiService: SpotifyAPIService
+
+    init(
+        apiService: SpotifyAPIService,
+        player: InternalSpotifyPlayer = InternalSpotifyPlayer()
+    ) {
+        self.apiService = apiService
         self.player = player
 
         // Wire player events into our callbacks.
@@ -33,38 +39,52 @@ final class SpotifyInternalPlaybackBackend: MusicPlaybackBackend {
     }
 
     func initialize() {
-        // For now, just load the skeleton HTML. Once the JS bridge calls
-        // back with a "ready" event, we'll mark isReady = true.
+        // Load the skeleton HTML / JS bridge.
         player.load()
+
+        // Fetch a Web Playback-capable token and inject it into JS.
+        Task {
+            do {
+                let token = try await apiService.getWebPlaybackAccessToken()
+                await MainActor.run {
+                    self.player.setAccessToken(token)
+                }
+            } catch {
+                await MainActor.run {
+                    self.onError?(.backend(message: "Failed to fetch Web Playback token: \(error.localizedDescription)"))
+                }
+            }
+        }
     }
 
     func playTrack(_ trackUri: String, startPositionMs: Int?) {
-        // Not yet implemented – we'll wire this to JS later.
-        debugPrint("[SpotifyInternalPlaybackBackend] playTrack(uri: \(trackUri), startPositionMs: \(startPositionMs ?? 0)) – not implemented yet")
+        // For now we just call play() – later we'll wire trackUri + seek.
+        debugPrint("[SpotifyInternalPlaybackBackend] playTrack(uri: \(trackUri), startPositionMs: \(startPositionMs ?? 0))")
+        player.play()
     }
 
     func pause() {
-        debugPrint("[SpotifyInternalPlaybackBackend] pause() – not implemented yet")
+        player.pause()
     }
 
     func resume() {
-        debugPrint("[SpotifyInternalPlaybackBackend] resume() – not implemented yet")
+        player.play()
     }
 
     func nextTrack() {
-        debugPrint("[SpotifyInternalPlaybackBackend] nextTrack() – not implemented yet")
+        player.nextTrack()
     }
 
     func previousTrack() {
-        debugPrint("[SpotifyInternalPlaybackBackend] previousTrack() – not implemented yet")
+        player.previousTrack()
     }
 
     func seek(to positionMs: Int) {
-        debugPrint("[SpotifyInternalPlaybackBackend] seek(to: \(positionMs)) – not implemented yet")
+        player.seek(to: positionMs)
     }
 
     func setVolume(_ value: Double) {
-        debugPrint("[SpotifyInternalPlaybackBackend] setVolume(\(value)) – not implemented yet")
+        player.setVolume(value)
     }
 
     // MARK: - Private helpers

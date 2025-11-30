@@ -45,9 +45,9 @@ struct PlaybackBackendFactory {
             return SpotifyExternalPlaybackBackend(apiService: apiService)
 
         case .internalWebPlayer:
-            // Experimental: internal web player.
-            // For now this is just a skeleton; commands are logged but not executed.
-            return SpotifyInternalPlaybackBackend()
+            // Internal web player: runs the Spotify Web Playback SDK in a WKWebView.
+            // Still experimental; commands are wired through InternalSpotifyPlayer.
+            return SpotifyInternalPlaybackBackend(apiService: apiService)
         }
     }
 }

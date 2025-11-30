@@ -54,6 +54,100 @@ final class InternalSpotifyPlayer: NSObject, WKScriptMessageHandler {
         contentController.add(self, name: "playerEvent")
     }
 
+    /// Escapes a Swift string so it can be safely embedded in a single-quoted
+    /// JS string literal. This is simple but good enough for tokens.
+    private func jsEscaped(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "'", with: "\\'")
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\r")
+    }
+
+    // MARK: - Public control API (to be called from the backend)
+
+    /// Injects the Spotify access token into the JS environment.
+    /// The internal_player.html JS side will later read this and
+    /// initialize the Web Playback SDK with it.
+    func setAccessToken(_ token: String) {
+        let escaped = jsEscaped(token)
+        let script = """
+        if (window.INTERNAL_PLAYER && typeof window.INTERNAL_PLAYER.setAccessToken === 'function') {
+            window.INTERNAL_PLAYER.setAccessToken('\(escaped)');
+        } else {
+            console.warn('INTERNAL_PLAYER.setAccessToken not available yet');
+        }
+        """
+        evaluateJavaScript(script)
+    }
+
+    func play() {
+        let script = """
+        if (window.INTERNAL_PLAYER && typeof window.INTERNAL_PLAYER.play === 'function') {
+            window.INTERNAL_PLAYER.play();
+        } else {
+            console.warn('INTERNAL_PLAYER.play not available yet');
+        }
+        """
+        evaluateJavaScript(script)
+    }
+
+    func pause() {
+        let script = """
+        if (window.INTERNAL_PLAYER && typeof window.INTERNAL_PLAYER.pause === 'function') {
+            window.INTERNAL_PLAYER.pause();
+        } else {
+            console.warn('INTERNAL_PLAYER.pause not available yet');
+        }
+        """
+        evaluateJavaScript(script)
+    }
+
+    func nextTrack() {
+        let script = """
+        if (window.INTERNAL_PLAYER && typeof window.INTERNAL_PLAYER.next === 'function') {
+            window.INTERNAL_PLAYER.next();
+        } else {
+            console.warn('INTERNAL_PLAYER.next not available yet');
+        }
+        """
+        evaluateJavaScript(script)
+    }
+
+    func previousTrack() {
+        let script = """
+        if (window.INTERNAL_PLAYER && typeof window.INTERNAL_PLAYER.previous === 'function') {
+            window.INTERNAL_PLAYER.previous();
+        } else {
+            console.warn('INTERNAL_PLAYER.previous not available yet');
+        }
+        """
+        evaluateJavaScript(script)
+    }
+
+    func seek(to positionMs: Int) {
+        let script = """
+        if (window.INTERNAL_PLAYER && typeof window.INTERNAL_PLAYER.seek === 'function') {
+            window.INTERNAL_PLAYER.seek(\(positionMs));
+        } else {
+            console.warn('INTERNAL_PLAYER.seek not available yet');
+        }
+        """
+        evaluateJavaScript(script)
+    }
+
+    func setVolume(_ value: Double) {
+        let clamped = max(0.0, min(1.0, value))
+        let script = """
+        if (window.INTERNAL_PLAYER && typeof window.INTERNAL_PLAYER.setVolume === 'function') {
+            window.INTERNAL_PLAYER.setVolume(\(clamped));
+        } else {
+            console.warn('INTERNAL_PLAYER.setVolume not available yet');
+        }
+        """
+        evaluateJavaScript(script)
+    }
+
     // MARK: - Public API
 
     /// Load the internal player HTML. For now we just load a trivial
