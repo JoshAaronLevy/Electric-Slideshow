@@ -395,6 +395,53 @@ final class SpotifyAPIService: ObservableObject {
             throw APIError.playbackFailed
         }
     }
+
+    // MARK: - Shuffle / Repeat
+
+    /// Toggle shuffle on/off for the current user's playback.
+    func setShuffle(isOn: Bool) async throws {
+        let token = try await authService.getValidAccessToken()  // or your equivalent
+
+        var components = URLComponents(string: "\(baseURL)/me/player/shuffle")!
+        components.queryItems = [
+            URLQueryItem(name: "state", value: isOn ? "true" : "false")
+            // Optionally: URLQueryItem(name: "device_id", value: currentDeviceId)
+        ]
+
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PUT"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        _ = try await URLSession.shared.data(for: request)
+    }
+
+    /// Set repeat mode for the current user's playback.
+    ///
+    /// We map `PlaybackRepeatMode.off` → "off" and `.all` → "context"
+    /// (repeat the current playlist/queue).
+    func setRepeat(mode: PlaybackRepeatMode) async throws {
+        let token = try await authService.getValidAccessToken()  // or your equivalent
+
+        let state: String
+        switch mode {
+        case .off:
+            state = "off"
+        case .all:
+            state = "context"
+        }
+
+        var components = URLComponents(string: "\(baseURL)/me/player/repeat")!
+        components.queryItems = [
+            URLQueryItem(name: "state", value: state)
+            // Optionally: URLQueryItem(name: "device_id", value: currentDeviceId)
+        ]
+
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PUT"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        _ = try await URLSession.shared.data(for: request)
+    }
     
     func getCurrentPlaybackState() async throws -> SpotifyPlaybackState? {
         let url = baseURL.appendingPathComponent("me/player")

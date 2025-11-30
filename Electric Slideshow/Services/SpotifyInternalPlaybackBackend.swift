@@ -88,4 +88,12 @@ final class SpotifyInternalPlaybackBackend: MusicPlaybackBackend {
             onError?(.backend(message: event.message ?? "Internal player error"))
         }
     }
+
+    func setShuffleEnabled(_ isOn: Bool) {
+        debugPrint("[SpotifyInternalPlaybackBackend] setShuffleEnabled(\(isOn)) – not implemented yet")
+    }
+
+    func setRepeatMode(_ mode: PlaybackRepeatMode) {
+        debugPrint("[SpotifyInternalPlaybackBackend] setRepeatMode(\(mode)) – not implemented yet")
+    }
 }

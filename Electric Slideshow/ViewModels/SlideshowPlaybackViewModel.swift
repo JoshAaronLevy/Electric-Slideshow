@@ -17,6 +17,8 @@ final class SlideshowPlaybackViewModel: ObservableObject {
     /// rather than just “Continue without music”.
     @Published var requiresSpotifyAppInstall: Bool = false
     @Published var normalizedPlaybackState: PlaybackState = .idle
+    @Published var isShuffleEnabled: Bool = false
+    @Published var repeatMode: PlaybackRepeatMode = .off
     
     private var slideTimer: Timer?
     private var playbackCheckTimer: Timer?
@@ -492,6 +494,26 @@ final class SlideshowPlaybackViewModel: ObservableObject {
                 print("[SlideshowPlaybackViewModel] Failed to resume Spotify playback: \(error)")
             }
         }
+    }
+
+    func setShuffleEnabled(_ isOn: Bool) {
+        isShuffleEnabled = isOn
+        musicBackend?.setShuffleEnabled(isOn)
+    }
+
+    func setRepeatAllEnabled(_ isOn: Bool) {
+        repeatMode = isOn ? .all : .off
+        musicBackend?.setRepeatMode(repeatMode)
+    }
+
+    /// Optional: convenience toggles for UI
+    func toggleShuffle() {
+        setShuffleEnabled(!isShuffleEnabled)
+    }
+
+    func toggleRepeatAll() {
+        let newIsOn = (repeatMode != .all)
+        setRepeatAllEnabled(newIsOn)
     }
     
     // MARK: - Playback State Monitoring

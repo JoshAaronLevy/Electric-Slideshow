@@ -55,6 +55,14 @@ enum PlaybackError: Error {
     case backend(message: String)  // Backend-specific / SDK error
 }
 
+/// Simple repeat modes understood by the app.
+/// We deliberately keep this generic so it can work with
+/// Spotify external device and internal web player.
+enum PlaybackRepeatMode {
+    case off
+    case all
+}
+
 /// Common interface for anything that can play music for Electric Slideshow.
 /// The slideshow engine talks ONLY to this, never directly to Spotify APIs.
 ///
@@ -112,6 +120,11 @@ protocol MusicPlaybackBackend: AnyObject {
     /// Implementations that cannot control volume may either ignore
     /// this call or surface an appropriate `PlaybackError`.
     func setVolume(_ value: Double)
+    /// Enable/disable shuffle for the current playback context.
+    func setShuffleEnabled(_ isOn: Bool)
+
+    /// Set the repeat mode (off / repeat all).
+    func setRepeatMode(_ mode: PlaybackRepeatMode)
 }
 
 /// A simple no-op backend that does nothing. Useful for previews or
@@ -139,4 +152,9 @@ final class NoopPlaybackBackend: MusicPlaybackBackend {
     func previousTrack() { }
     func seek(to positionMs: Int) { }
     func setVolume(_ value: Double) { }
+    /// Enable/disable shuffle for the current playback context.
+    func setShuffleEnabled(_ isOn: Bool) { }
+
+    /// Set the repeat mode (off / repeat all).
+    func setRepeatMode(_ mode: PlaybackRepeatMode) { }
 }

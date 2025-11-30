@@ -96,4 +96,24 @@ final class SpotifyExternalPlaybackBackend: MusicPlaybackBackend {
         // You don't have volume APIs wired yet, so we simply ignore this for now.
         debugPrint("[SpotifyExternalPlaybackBackend] setVolume(\(value)) – not implemented")
     }
+
+    func setShuffleEnabled(_ isOn: Bool) {
+        Task {
+            do {
+                try await apiService.setShuffle(isOn: isOn)
+            } catch {
+                self.onError?(.backend(message: "Failed to set shuffle: \(error.localizedDescription)"))
+            }
+        }
+    }
+
+    func setRepeatMode(_ mode: PlaybackRepeatMode) {
+        Task {
+            do {
+                try await apiService.setRepeat(mode: mode)
+            } catch {
+                self.onError?(.backend(message: "Failed to set repeat mode: \(error.localizedDescription)"))
+            }
+        }
+    }
 }

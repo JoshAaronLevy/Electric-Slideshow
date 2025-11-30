@@ -120,6 +120,14 @@ struct SlideshowPlaybackView: View {
                 viewModel?.updateClipMode(newMode)
             }
 
+            playbackBridge.toggleShuffle = { [weak viewModel] in
+                viewModel?.toggleShuffle()
+            }
+
+            playbackBridge.toggleRepeatAll = { [weak viewModel] in
+                viewModel?.toggleRepeatAll()
+            }
+
             syncPlaybackBridge()
         }
         // Whenever the slideshow or playback state changes, mirror it into the bridge
@@ -215,6 +223,8 @@ struct SlideshowPlaybackView: View {
         playbackBridge.currentSlideIndex = viewModel.currentIndex
         playbackBridge.totalSlides = viewModel.loadedImages.count
         playbackBridge.isSlideshowPlaying = viewModel.isPlaying
+        playbackBridge.isShuffleEnabled = viewModel.isShuffleEnabled
+        playbackBridge.isRepeatAllEnabled = (viewModel.repeatMode == .all)
 
         // Music / normalized playback state
         let state = viewModel.normalizedPlaybackState

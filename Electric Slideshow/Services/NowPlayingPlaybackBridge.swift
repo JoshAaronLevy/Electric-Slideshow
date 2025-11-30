@@ -18,6 +18,8 @@ final class NowPlayingPlaybackBridge: ObservableObject {
     var musicPreviousTrack: (() -> Void)?
     var musicTogglePlayPause: (() -> Void)?
     var musicNextTrack: (() -> Void)?
+    var toggleShuffle: (() -> Void)?
+    var toggleRepeatAll: (() -> Void)?
 
     // MARK: - Mode / configuration callbacks
 
@@ -48,4 +50,10 @@ final class NowPlayingPlaybackBridge: ObservableObject {
 
     /// Currently selected clip mode for music playback in Now Playing.
     @Published var clipMode: MusicClipMode = .seconds30
+
+    /// Whether shuffle is currently enabled for the playlist.
+    @Published var isShuffleEnabled: Bool = false
+
+    /// Whether "repeat all" is currently enabled.
+    @Published var isRepeatAllEnabled: Bool = false
 }
