@@ -154,6 +154,52 @@ final class SpotifyAPIService: ObservableObject {
         return savedTracksResponse.items.map { $0.track }
     }
     
+    /// Fetches metadata for a list of Spotify track URIs using the `/tracks` endpoint.
+    /// Spotify allows up to 50 IDs per request, so this batches as needed.
+    func fetchTracks(forURIs uris: [String]) async throws -> [SpotifyTrack] {
+        // Extract track IDs from URIs (e.g., "spotify:track:123")
+        let trackIds = uris.compactMap(Self.trackId(fromURI:))
+        guard !trackIds.isEmpty else { return [] }
+        
+        let token = try await authService.getValidAccessToken()
+        var results: [SpotifyTrack] = []
+        
+        for batch in trackIds.chunked(into: 50) {
+            var components = URLComponents(
+                url: baseURL.appendingPathComponent("tracks"),
+                resolvingAgainstBaseURL: false
+            )!
+            components.queryItems = [
+                URLQueryItem(name: "ids", value: batch.joined(separator: ","))
+            ]
+            
+            guard let url = components.url else { continue }
+            
+            var request = URLRequest(url: url)
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("[SpotifyAPI] ERROR: Invalid response type")
+                throw APIError.requestFailed(statusCode: 0, message: "Invalid response")
+            }
+            
+            print("[SpotifyAPI] Fetch tracks request status: \(httpResponse.statusCode)")
+            
+            guard (200...299).contains(httpResponse.statusCode) else {
+                let errorBody = String(data: data, encoding: .utf8) ?? "(no body)"
+                print("[SpotifyAPI] ERROR: Fetch tracks failed with \(httpResponse.statusCode): \(errorBody)")
+                throw APIError.requestFailed(statusCode: httpResponse.statusCode, message: errorBody)
+            }
+            
+            let tracksResponse = try JSONDecoder().decode(SpotifyTracksListResponse.self, from: data)
+            results.append(contentsOf: tracksResponse.tracks)
+        }
+        
+        return results
+    }
+    
     // MARK: - Playback
 
     // MARK: - Devices
@@ -497,6 +543,33 @@ final class SpotifyAPIService: ObservableObject {
                 return "Failed to control playback"
             }
         }
+    }
+}
+
+// MARK: - Helpers
+
+private extension Array {
+    /// Returns an array of arrays, each with at most `size` elements.
+    func chunked(into size: Int) -> [[Element]] {
+        guard size > 0 else { return [] }
+        var result: [[Element]] = []
+        var index = startIndex
+        
+        while index < endIndex {
+            let end = self.index(index, offsetBy: size, limitedBy: endIndex) ?? endIndex
+            result.append(Array(self[index..<end]))
+            index = end
+        }
+        
+        return result
+    }
+}
+
+private extension SpotifyAPIService {
+    static func trackId(fromURI uri: String) -> String? {
+        let components = uri.split(separator: ":")
+        guard components.count >= 3 else { return nil }
+        return String(components[2])
     }
 }
 

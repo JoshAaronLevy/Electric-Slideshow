@@ -1,7 +1,7 @@
 import Foundation
 
 /// Controls how long each music track should play while a slideshow is running.
-enum MusicClipMode: String, CaseIterable, Identifiable {
+enum MusicClipMode: String, CaseIterable, Identifiable, Codable {
     case seconds30
     case seconds45
     case seconds60

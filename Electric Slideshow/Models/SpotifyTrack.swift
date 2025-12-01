@@ -60,3 +60,8 @@ struct SpotifySavedTracksResponse: Codable {
         let track: SpotifyTrack
     }
 }
+
+/// Response wrapper for the `/tracks` batch lookup endpoint
+struct SpotifyTracksListResponse: Codable {
+    let tracks: [SpotifyTrack]
+}
