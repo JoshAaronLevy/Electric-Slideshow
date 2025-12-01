@@ -55,6 +55,20 @@ private struct SidebarHoverRowModifier: ViewModifier {
     }
 }
 
+/// A modifier that changes the cursor to a pointing hand on hover.
+/// This is a fallback/alternative for older macOS versions where .cursor() might be missing or behaving differently.
+private struct PointingHandCursorModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content.onHover { inside in
+            if inside {
+                NSCursor.pointingHand.push()
+            } else {
+                NSCursor.pop()
+            }
+        }
+    }
+}
+
 // MARK: - View extensions
 
 extension View {
@@ -68,5 +82,9 @@ extension View {
 
     func sidebarHoverRow(isHovering: Bool) -> some View {
         modifier(SidebarHoverRowModifier(isHovering: isHovering))
+    }
+
+    func pointingHandCursor() -> some View {
+        modifier(PointingHandCursorModifier())
     }
 }

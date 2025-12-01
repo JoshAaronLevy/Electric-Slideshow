@@ -66,7 +66,7 @@ struct SlideshowPlaybackView: View {
                         // Only interaction with the photo: toggle slideshow + music play/pause
                         viewModel.togglePlayPause()
                     }
-                    .cursor(.pointingHand)
+                    .pointingHandCursor()
                 }
                 .ignoresSafeArea(edges: .all)
             }
