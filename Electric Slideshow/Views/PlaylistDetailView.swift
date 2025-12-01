@@ -55,6 +55,13 @@ struct PlaylistDetailView: View {
                 .task(id: playlist.trackURIs) {
                     await loadTracks()
                 }
+                .onChange(of: trackRows.count) { _ in
+                    guard let index = selectedRowIndex, index < trackRows.count else {
+                        selectedRowIndex = nil
+                        return
+                    }
+                    selectedRowIndex = index
+                }
                 .onAppear {
                     playlistClipMode = playlist.playlistDefaultClipMode
                 }
@@ -230,11 +237,7 @@ struct PlaylistDetailView: View {
     private var inspector: some View {
         Group {
             if let row = selectedRow {
-                ContentUnavailableView {
-                    Label("Track details coming soon", systemImage: "waveform")
-                } description: {
-                    Text("“\(row.metadata?.name ?? "Selected track")” is selected. Editing controls will arrive in the next stages.")
-                }
+                inspectorDetail(for: row)
             } else {
                 ContentUnavailableView {
                     Label("Select a track", systemImage: "cursorarrow.click")
@@ -250,6 +253,97 @@ struct PlaylistDetailView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color.secondary.opacity(0.12))
         )
+    }
+    
+    @ViewBuilder
+    private func inspectorDetail(for row: PlaylistTrackRow) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 16) {
+                albumArtView(for: row.metadata?.album.imageURL)
+                    .frame(width: 120, height: 120)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(row.metadata?.name ?? "Unknown Track")
+                        .font(.title3.weight(.semibold))
+                        .lineLimit(2)
+                    Text(row.subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                    
+                    HStack(spacing: 8) {
+                        clipBadge(text: "Default")
+                        if let duration = row.metadata?.durationMs {
+                            Text("Full \(formatDuration(ms: duration))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Clip")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(clipDescription())
+                    .font(.body)
+                Text("Effective: \(effectiveClipText(for: row.metadata))")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            
+            Divider()
+            
+            ContentUnavailableView {
+                Label("Editing coming soon", systemImage: "slider.horizontal.3")
+            } description: {
+                Text("Selection is wired up. Clip editing and playback controls arrive in later stages.")
+            }
+        }
+    }
+    
+    private func clipDescription() -> String {
+        if let playlistMode = playlistClipMode {
+            return "Default · Playlist: \(playlistMode.displayName)"
+        } else {
+            return "Default · Global: \(globalDefaultClipMode.displayName)"
+        }
+    }
+    
+    @ViewBuilder
+    private func albumArtView(for url: URL?) -> some View {
+        if let url {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .empty:
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color.secondary.opacity(0.08))
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                case .failure:
+                    placeholderArt
+                @unknown default:
+                    placeholderArt
+                }
+            }
+        } else {
+            placeholderArt
+        }
+    }
+    
+    private var placeholderArt: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.secondary.opacity(0.08))
+            Image(systemName: "music.note")
+                .font(.title)
+                .foregroundStyle(.secondary)
+        }
     }
     
     // MARK: - Data loading
