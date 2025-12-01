@@ -29,6 +29,8 @@ final class SlideshowPlaybackViewModel: ObservableObject {
     private let playlistsStore: PlaylistsStore?
     private var playbackIndices: [Int] = []
     private var musicClipMode: MusicClipMode = .seconds60
+    private var lastClipAppliedTrackUri: String?
+    private let minClipWindowMs = 500
     private let musicBackend: MusicPlaybackBackend?
     
     var currentImage: NSImage? {
@@ -162,67 +164,11 @@ final class SlideshowPlaybackViewModel: ObservableObject {
         musicClipTimer = nil
     }
 
-    /// Starts or restarts the timer that will advance to the next track
-    /// after the configured clip duration. If the mode is `.fullSong`, no timer is scheduled.
-    /// For `.seconds60`, the clip starts at a random point in the song.
+    /// Applies the current clip settings (custom, playlist default, or global) to the active track.
+    /// Seeks to the correct start and arms a timer to advance when the clip window ends.
     private func resetMusicClipTimerForCurrentTrack() {
-        stopMusicClipTimer()
-
-        // Only schedule if we have a finite clip duration
-        guard let clipDuration = musicClipMode.clipDuration else {
-            return // Full song → no timer, no seek
-        }
-
-        // Capture current mode and duration at this moment (in case user changes it later)
-        let modeAtScheduling = musicClipMode
-
-        // If we don't have a Spotify service, just behave like "start from 0, run for duration"
-        guard let apiService = spotifyAPIService else {
-            startMusicClipTimer(duration: clipDuration)
-            return
-        }
-
-        Task { [weak self] in
-            guard let self else { return }
-
-            // Default behavior: start at 0 unless we can randomize
-            var startMs = 0
-
-            if modeAtScheduling == .seconds30 || modeAtScheduling == .seconds45 || modeAtScheduling == .seconds60 {
-                do {
-                    // Get current playback state (includes the active track and its duration)
-                    if let state = try await apiService.getCurrentPlaybackState(),
-                       let track = state.item {
-
-                        let durationMs = track.durationMs
-                        let clipMs = Int(clipDuration * 1000)
-
-                        if durationMs > clipMs {
-                            let maxStart = durationMs - clipMs
-                            startMs = Int.random(in: 0...maxStart)
-                        } else {
-                            // Track is shorter than the clip → just start at 0
-                            startMs = 0
-                        }
-                    }
-                } catch {
-                    print("[SlideshowPlaybackViewModel] Failed to fetch playback state for random clip: \(error)")
-                }
-
-                do {
-                    // If we computed a non-zero start, seek into the track
-                    if startMs > 0 {
-                        try await apiService.seekToPosition(positionMs: startMs)
-                    }
-                } catch {
-                    print("[SlideshowPlaybackViewModel] Failed to seek for random clip: \(error)")
-                }
-            }
-
-            // Finally, arm the timer for this clip duration on the main actor
-            await MainActor.run {
-                self.startMusicClipTimer(duration: clipDuration)
-            }
+        Task { @MainActor [weak self] in
+            await self?.applyClipForCurrentTrack()
         }
     }
 
@@ -586,6 +532,9 @@ final class SlideshowPlaybackViewModel: ObservableObject {
             let state = try await apiService.getCurrentPlaybackState()
             currentPlaybackState = state
             updateNormalizedPlaybackState(from: state)
+            if let uri = state?.item?.uri, uri != lastClipAppliedTrackUri {
+                resetMusicClipTimerForCurrentTrack()
+            }
         } catch {
             // Silently fail
         }
@@ -599,19 +548,113 @@ final class SlideshowPlaybackViewModel: ObservableObject {
             return
         }
 
-        // We don't have duration in SpotifyTrack uploaded here, so we use 0 for now.
-        // Once you expose duration on SpotifyTrack, plug it in below.
-        let durationMs = 0
-
         normalizedPlaybackState = PlaybackState(
-            trackUri: nil,                    // You can wire a URI later if desired
+            trackUri: track.uri,
             trackName: track.name,
             artistName: track.artists.first?.name,
             positionMs: playback.progressMs ?? 0,
-            durationMs: durationMs,
+            durationMs: track.durationMs,
             isPlaying: playback.isPlaying,
             isBuffering: false
         )
+    }
+
+    // MARK: - Clip application (custom / playlist default / global)
+
+    /// Applies the effective clip window for the current Spotify track (custom > playlist default > global).
+    private func applyClipForCurrentTrack() async {
+        stopMusicClipTimer()
+
+        guard
+            let apiService = spotifyAPIService,
+            let playlistId = slideshow.settings.linkedPlaylistId,
+            let playlist = playlistsStore?.playlists.first(where: { $0.id == playlistId })
+        else {
+            return
+        }
+
+        do {
+            guard let playback = try await apiService.getCurrentPlaybackState(),
+                  let item = playback.item else {
+                return
+            }
+
+            let uri = item.uri
+            let trackDuration = item.durationMs
+            let playlistTrack = playlist.playlistTracks.first { $0.uri == uri }
+            let clipWindow = effectiveClipWindow(
+                track: playlistTrack,
+                playlist: playlist,
+                trackDurationMs: trackDuration
+            )
+
+            // Seek to the clip start if needed
+            if let startMs = clipWindow.startMs, startMs > 0 {
+                if let backend = musicBackend, backend.isReady {
+                    backend.seek(to: startMs)
+                } else {
+                    try await apiService.seekToPosition(positionMs: startMs)
+                }
+            }
+
+            // Arm timer for clip duration
+            if let durationMs = clipWindow.durationMs {
+                startMusicClipTimer(duration: Double(durationMs) / 1000.0)
+            }
+
+            lastClipAppliedTrackUri = uri
+        } catch {
+            // If we fail to fetch state or seek, just leave playback running.
+            print("[SlideshowPlaybackViewModel] Failed to apply clip: \(error)")
+        }
+    }
+
+    private func effectiveClipWindow(
+        track: PlaylistTrack?,
+        playlist: AppPlaylist,
+        trackDurationMs: Int?
+    ) -> (startMs: Int?, durationMs: Int?) {
+        let durationMsPreferred = trackDurationMs ?? track?.durationMs
+
+        // Custom clip
+        if let track, track.clipMode == .custom {
+            let start = max(0, track.customStartMs ?? 0)
+            let endRaw = track.customEndMs ?? (durationMsPreferred ?? start)
+            let clampedEnd = clamp(endRaw, to: durationMsPreferred, lowerBound: start + minClipWindowMs)
+            let duration = max(clampedEnd - start, minClipWindowMs)
+            return (start, duration)
+        }
+
+        // Playlist default or global
+        let mode = playlist.playlistDefaultClipMode ?? musicClipMode
+        guard let clipSeconds = mode.clipDuration else {
+            // Full song: no timer, play to natural end
+            return (0, trackDurationMs)
+        }
+
+        let clipMs = Int(clipSeconds * 1000)
+        let durationMs: Int
+        let startMs: Int
+
+        if let duration = durationMsPreferred, duration > clipMs {
+            // Random start within track if it can fit the clip window
+            let maxStart = max(duration - clipMs, 0)
+            startMs = maxStart > 0 ? Int.random(in: 0...maxStart) : 0
+            durationMs = clipMs
+        } else {
+            startMs = 0
+            durationMs = durationMsPreferred.map { min($0, clipMs) } ?? clipMs
+        }
+
+        return (startMs, durationMs)
+    }
+
+    private func clamp(_ value: Int, to upperBound: Int?, lowerBound: Int) -> Int {
+        if let upper = upperBound {
+            return min(max(value, lowerBound), upper)
+        } else {
+            return max(value, lowerBound)
+        }
     }
     
     // MARK: - Music Controls
