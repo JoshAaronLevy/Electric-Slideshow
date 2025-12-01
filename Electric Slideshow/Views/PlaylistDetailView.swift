@@ -21,6 +21,9 @@ struct PlaylistDetailView: View {
     @State private var playbackState: PlaybackState = .idle
     @State private var previewTimer: Timer?
     @State private var playbackMessage: String?
+    @State private var showingAddTrackSheet = false
+    @State private var newTrackURI: String = ""
+    @State private var addTrackError: String?
     
     /// Temporary global default; in later stages we will source this from shared playback state.
     private let globalDefaultClipMode: MusicClipMode = .seconds60
@@ -85,6 +88,27 @@ struct PlaylistDetailView: View {
                 }
                 .onChange(of: selectedRowIndex) { _ in
                     syncInspectorFields()
+                }
+                .toolbar {
+                    ToolbarItemGroup {
+                        Button {
+                            removeSelectedTrack()
+                        } label: {
+                            Label("Remove Track", systemImage: "trash")
+                        }
+                        .disabled(selectedRowIndex == nil)
+                        
+                        Button {
+                            showingAddTrackSheet = true
+                            addTrackError = nil
+                            newTrackURI = ""
+                        } label: {
+                            Label("Add Track", systemImage: "plus")
+                        }
+                    }
+                }
+                .sheet(isPresented: $showingAddTrackSheet) {
+                    addTrackSheet
                 }
             } else {
                 ContentUnavailableView {
@@ -171,6 +195,8 @@ struct PlaylistDetailView: View {
                         trackRowView(row, index: index)
                             .tag(index as Int?)
                     }
+                    .onMove(perform: moveRows)
+                    .onDelete(perform: deleteRows)
                 }
                 .listStyle(.inset)
             }
@@ -391,6 +417,38 @@ struct PlaylistDetailView: View {
         } else {
             return "Uses global default (\(globalDefaultClipMode.displayName))"
         }
+    }
+
+    private var addTrackSheet: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Add Track")
+                .font(.headline)
+            
+            TextField("Spotify track URI", text: $newTrackURI)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit {
+                    handleAddTrack()
+                }
+            
+            if let error = addTrackError {
+                Text(error)
+                    .font(.footnote)
+                    .foregroundColor(.red)
+            }
+            
+            HStack {
+                Spacer()
+                Button("Cancel") {
+                    showingAddTrackSheet = false
+                }
+                Button("Add") {
+                    handleAddTrack()
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding()
+        .frame(width: 360)
     }
     
     @ViewBuilder
@@ -704,6 +762,71 @@ struct PlaylistDetailView: View {
         guard var playlist else { return }
         playlist.playlistTracks = trackRows.map { $0.track }
         playlistsStore.updatePlaylist(playlist)
+    }
+    
+    private func handleAddTrack() {
+        let uri = newTrackURI.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !uri.isEmpty else {
+            addTrackError = "Enter a Spotify track URI."
+            return
+        }
+        guard !trackRows.contains(where: { $0.track.uri == uri }) else {
+            addTrackError = "Track is already in this playlist."
+            return
+        }
+        
+        Task {
+            var newTrack = PlaylistTrack(uri: uri)
+            var metaResult: SpotifyTrack?
+            if spotifyAuthService.isAuthenticated {
+                do {
+                    let tracks = try await apiService.fetchTracks(forURIs: [uri])
+                    if let meta = tracks.first {
+                        newTrack.name = meta.name
+                        newTrack.artist = meta.artistNames
+                        newTrack.album = meta.album.name
+                        newTrack.durationMs = meta.durationMs
+                        newTrack.albumArtURL = meta.album.imageURL
+                        newTrack.fetchedAt = Date()
+                        metaResult = meta
+                    }
+                } catch {
+                    // Ignore metadata failures; still add track.
+                }
+            }
+            
+            await MainActor.run {
+                trackRows.append(PlaylistTrackRow(track: newTrack, metadata: metaResult))
+                persistPlaylistTracks()
+                selectedRowIndex = trackRows.count - 1
+                showingAddTrackSheet = false
+                newTrackURI = ""
+                addTrackError = nil
+            }
+        }
+    }
+    
+    private func deleteRows(at offsets: IndexSet) {
+        let selectedId = selectedRow?.id
+        trackRows.remove(atOffsets: offsets)
+        persistPlaylistTracks()
+        selectedRowIndex = selectedId.flatMap { id in
+            trackRows.firstIndex(where: { $0.id == id })
+        }
+    }
+    
+    private func moveRows(from source: IndexSet, to destination: Int) {
+        let selectedId = selectedRow?.id
+        trackRows.move(fromOffsets: source, toOffset: destination)
+        persistPlaylistTracks()
+        selectedRowIndex = selectedId.flatMap { id in
+            trackRows.firstIndex(where: { $0.id == id })
+        }
+    }
+    
+    private func removeSelectedTrack() {
+        guard let selected = selectedRowIndex else { return }
+        deleteRows(at: IndexSet(integer: selected))
     }
     
     private func syncInspectorFields() {
