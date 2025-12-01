@@ -34,12 +34,23 @@ final class SpotifyExternalPlaybackBackend: MusicPlaybackBackend {
     }
 
     func playTrack(_ trackUri: String, startPositionMs: Int?) {
-        // For your current flow you usually start a playlist via startPlayback(trackURIs:),
-        // so we don't use this yet. We can wire it later if/when you want
-        // track-level control through the backend.
-        //
-        // Keeping a debug log so we know if something accidentally calls it.
-        debugPrint("[SpotifyExternalPlaybackBackend] playTrack(uri: \(trackUri), startPositionMs: \(startPositionMs ?? 0)) – not wired yet")
+        Task {
+            do {
+                try await apiService.startPlayback(trackURIs: [trackUri], startPositionMs: startPositionMs)
+                let state = PlaybackState(
+                    trackUri: trackUri,
+                    trackName: nil,
+                    artistName: nil,
+                    positionMs: startPositionMs ?? 0,
+                    durationMs: 0,
+                    isPlaying: true,
+                    isBuffering: false
+                )
+                onStateChanged?(state)
+            } catch {
+                self.onError?(.backend(message: "Failed to start playback: \(error.localizedDescription)"))
+            }
+        }
     }
 
     func pause() {

@@ -271,7 +271,7 @@ final class SpotifyAPIService: ObservableObject {
         }
     }
 
-    func startPlayback(trackURIs: [String], deviceId: String? = nil) async throws {
+    func startPlayback(trackURIs: [String], deviceId: String? = nil, startPositionMs: Int? = nil) async throws {
         // Build URL with optional ?device_id=...
         var components = URLComponents(url: baseURL.appendingPathComponent("me/player/play"),
                                     resolvingAgainstBaseURL: false)!
@@ -295,6 +295,9 @@ final class SpotifyAPIService: ObservableObject {
         var body: [String: Any] = [:]
         if !trackURIs.isEmpty {
             body["uris"] = trackURIs
+        }
+        if let startPositionMs {
+            body["position_ms"] = startPositionMs
         }
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)

@@ -17,6 +17,11 @@ struct PlaylistDetailView: View {
     @State private var endText: String = ""
     @State private var inspectorError: String?
     
+    @State private var playbackBackend: MusicPlaybackBackend?
+    @State private var playbackState: PlaybackState = .idle
+    @State private var previewTimer: Timer?
+    @State private var playbackMessage: String?
+    
     /// Temporary global default; in later stages we will source this from shared playback state.
     private let globalDefaultClipMode: MusicClipMode = .seconds60
     private let minCustomClipDeltaMs = 500
@@ -62,6 +67,7 @@ struct PlaylistDetailView: View {
                 .onAppear {
                     playlistClipMode = playlist.playlistDefaultClipMode
                     syncInspectorFields()
+                    preparePlaybackBackendIfNeeded()
                 }
                 .onChange(of: playlist.playlistDefaultClipMode) { newValue in
                     playlistClipMode = newValue
@@ -329,11 +335,7 @@ struct PlaylistDetailView: View {
             
             Divider()
             
-            ContentUnavailableView {
-                Label("Playback coming later", systemImage: "slider.horizontal.3")
-            } description: {
-                Text("Clip editing is live. Playback controls arrive in later stages.")
-            }
+            playbackControls(for: row)
         }
     }
     
@@ -392,6 +394,61 @@ struct PlaylistDetailView: View {
     }
     
     @ViewBuilder
+    private func playbackControls(for row: PlaylistTrackRow) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Playback")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            
+            if let reason = playbackUnavailableReason(for: row) {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.orange)
+                    Text(reason)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                HStack(spacing: 12) {
+                    Button(playPauseLabel) {
+                        togglePlayPause(for: row)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .disabled(!canControlPlayback)
+                    
+                    Button("Mark Start") {
+                        Task { await markCurrentPosition(as: .start) }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(!canControlPlayback)
+                    
+                    Button("Mark End") {
+                        Task { await markCurrentPosition(as: .end) }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(!canControlPlayback)
+                    
+                    Button("Preview") {
+                        previewClip(for: row)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(!canControlPlayback)
+                }
+                
+                if let message = playbackMessage {
+                    Text(message)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
     private func albumArtView(for url: URL?) -> some View {
         if let url {
             AsyncImage(url: url) { phase in
@@ -422,6 +479,161 @@ struct PlaylistDetailView: View {
             Image(systemName: "music.note")
                 .font(.title)
                 .foregroundStyle(.secondary)
+        }
+    }
+    
+    // MARK: - Playback helpers
+    
+    private var canControlPlayback: Bool {
+        guard let backend = playbackBackend else { return false }
+        return backend.isReady
+    }
+    
+    private var playPauseLabel: String {
+        playbackState.isPlaying ? "Pause" : "Play"
+    }
+    
+    private func playbackUnavailableReason(for row: PlaylistTrackRow) -> String? {
+        guard spotifyAuthService.isAuthenticated else {
+            return "Connect Spotify to enable preview and marking."
+        }
+        guard let backend = playbackBackend else {
+            return "Player not initialized yet."
+        }
+        if !backend.isReady {
+            return "Player is starting up…"
+        }
+        return nil
+    }
+    
+    private func preparePlaybackBackendIfNeeded() {
+        guard playbackBackend == nil else { return }
+        guard spotifyAuthService.isAuthenticated else { return }
+        
+        if let backend = PlaybackBackendFactory.makeBackend(mode: PlaybackBackendFactory.defaultMode, spotifyAPIService: apiService) {
+            backend.onStateChanged = { state in
+                DispatchQueue.main.async {
+                    self.playbackState = state
+                }
+            }
+            backend.onError = { error in
+                DispatchQueue.main.async {
+                    self.playbackMessage = "Playback error: \(error)"
+                }
+            }
+            backend.initialize()
+            playbackBackend = backend
+        } else {
+            playbackMessage = "No playback backend available."
+        }
+    }
+    
+    private func togglePlayPause(for row: PlaylistTrackRow) {
+        guard let backend = playbackBackend else { return }
+        
+        if playbackState.isPlaying {
+            backend.pause()
+        } else {
+            backend.playTrack(row.track.uri, startPositionMs: row.track.customStartMs ?? 0)
+        }
+    }
+    
+    private enum MarkPositionTarget {
+        case start
+        case end
+    }
+    
+    private func markCurrentPosition(as target: MarkPositionTarget) async {
+        guard spotifyAuthService.isAuthenticated else {
+            playbackMessage = "Connect Spotify to mark clips."
+            return
+        }
+        
+        guard let backend = playbackBackend, backend.isReady else {
+            playbackMessage = "Player not ready."
+            return
+        }
+        
+        do {
+            guard let state = try await apiService.getCurrentPlaybackState(),
+                  let uri = state.item?.uri else {
+                playbackMessage = "No active playback to mark."
+                return
+            }
+            
+            guard let index = selectedRowIndex else { return }
+            guard uri == trackRows[index].track.uri else {
+                playbackMessage = "Active track is different; start playback here first."
+                return
+            }
+            
+            let positionMs = state.progressMs ?? 0
+            applyMark(positionMs: positionMs, target: target, index: index)
+            playbackMessage = "Marked \(target == .start ? "start" : "end") at \(formatTimestamp(ms: positionMs))."
+        } catch {
+            playbackMessage = "Failed to read playback position."
+        }
+    }
+    
+    private func applyMark(positionMs: Int, target: MarkPositionTarget, index: Int) {
+        switch target {
+        case .start:
+            startText = formatTimestamp(ms: positionMs)
+        case .end:
+            endText = formatTimestamp(ms: positionMs)
+        }
+        handleCustomFieldChange()
+    }
+    
+    private func previewClip(for row: PlaylistTrackRow) {
+        guard let backend = playbackBackend else {
+            playbackMessage = "Player not initialized."
+            return
+        }
+        guard backend.isReady else {
+            playbackMessage = "Player not ready."
+            return
+        }
+        
+        previewTimer?.invalidate()
+        playbackMessage = nil
+        
+        let startMs: Int
+        let endMs: Int
+        switch row.track.clipMode {
+        case .custom:
+            startMs = row.track.customStartMs ?? 0
+            endMs = row.track.customEndMs ?? (row.metadata?.durationMs ?? row.track.durationMs ?? 0)
+        case .default:
+            startMs = 0
+            endMs = defaultClipEndMs(for: row) ?? (row.metadata?.durationMs ?? row.track.durationMs ?? 0)
+        }
+        
+        let duration = max(endMs - startMs, minCustomClipDeltaMs)
+        backend.playTrack(row.track.uri, startPositionMs: startMs)
+        playbackState = PlaybackState(
+            trackUri: row.track.uri,
+            trackName: row.title,
+            artistName: nil,
+            positionMs: startMs,
+            durationMs: endMs,
+            isPlaying: true,
+            isBuffering: false
+        )
+        
+        previewTimer = Timer.scheduledTimer(withTimeInterval: Double(duration) / 1000.0, repeats: false) { _ in
+            backend.pause()
+            DispatchQueue.main.async {
+                self.playbackState = PlaybackState(
+                    trackUri: row.track.uri,
+                    trackName: row.title,
+                    artistName: nil,
+                    positionMs: endMs,
+                    durationMs: endMs,
+                    isPlaying: false,
+                    isBuffering: false
+                )
+            }
         }
     }
     
