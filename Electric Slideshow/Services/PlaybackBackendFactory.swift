@@ -22,7 +22,7 @@ struct PlaybackBackendFactory {
 
     /// Global default mode for the app. Keep this `.externalDevice`
     /// until the internal player is fully implemented and tested.
-    static let defaultMode: PlaybackBackendMode = .internalWebPlayer
+    static let defaultMode: PlaybackBackendMode = .externalDevice
 
     /// Creates a music playback backend for the given mode.
     ///
