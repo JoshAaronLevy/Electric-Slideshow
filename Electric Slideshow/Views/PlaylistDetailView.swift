@@ -6,6 +6,7 @@ struct PlaylistDetailView: View {
     
     @EnvironmentObject private var playlistsStore: PlaylistsStore
     @EnvironmentObject private var spotifyAuthService: SpotifyAuthService
+    @Environment(\.dismiss) private var dismiss
     @StateObject private var apiService = SpotifyAPIService(authService: SpotifyAuthService.shared)
     
     @State private var trackRows: [PlaylistTrackRow] = []
@@ -34,7 +35,7 @@ struct PlaylistDetailView: View {
     }
     
     private var effectiveClipMode: MusicClipMode {
-        playlistClipMode ?? globalDefaultClipMode
+        playlistClipMode ?? .fullSong
     }
     
     private var selectedRow: PlaylistTrackRow? {
@@ -53,13 +54,16 @@ struct PlaylistDetailView: View {
             if let playlist {
                 VStack(alignment: .leading, spacing: 16) {
                     header(for: playlist)
-                    
-                    HStack(alignment: .top, spacing: 16) {
-                        tracksTable
-                            .frame(minWidth: 460)
-                        
-                        inspector
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+                    GeometryReader { proxy in
+                        HStack(alignment: .top, spacing: 16) {
+                            tracksTable
+                                .frame(width: max(proxy.size.width * 0.65, 460))
+                            
+                            inspector
+                                .frame(width: max(proxy.size.width * 0.35, 300), alignment: .topLeading)
+                        }
+                        .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
                     }
                 }
                 .padding()
@@ -68,12 +72,12 @@ struct PlaylistDetailView: View {
                     await loadTracks()
                 }
                 .onAppear {
-                    playlistClipMode = playlist.playlistDefaultClipMode
+                    playlistClipMode = playlist.playlistDefaultClipMode ?? .fullSong
                     syncInspectorFields()
                     preparePlaybackBackendIfNeeded()
                 }
                 .onChange(of: playlist.playlistDefaultClipMode) { newValue in
-                    playlistClipMode = newValue
+                    playlistClipMode = newValue ?? .fullSong
                 }
                 .onChange(of: playlistClipMode) { newValue in
                     updatePlaylistClipMode(newValue)
@@ -125,11 +129,20 @@ struct PlaylistDetailView: View {
     @ViewBuilder
     private func header(for playlist: AppPlaylist) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(playlist.name)
-                .font(.largeTitle)
-                .fontWeight(.semibold)
-            
             HStack(spacing: 12) {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "chevron.left")
+                }
+                .buttonStyle(.plain)
+                
+                Text(playlist.name)
+                    .font(.largeTitle)
+                    .fontWeight(.semibold)
+            }
+            
+            HStack(spacing: 16) {
                 Label("\(playlist.trackCount) songs", systemImage: "music.note.list")
                     .foregroundStyle(.secondary)
                 
@@ -143,27 +156,24 @@ struct PlaylistDetailView: View {
                     Label("Total duration unavailable", systemImage: "clock")
                         .foregroundStyle(.secondary)
                 }
-            }
-            
-            clipModePicker
-        }
-    }
-    
-    private var clipModePicker: some View {
-        HStack(spacing: 12) {
-            Text("Playlist clip length")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-            
-            Picker("Playlist clip length", selection: $playlistClipMode) {
-                Text("Use global default (\(globalDefaultClipMode.displayName))")
-                    .tag(nil as MusicClipMode?)
-                ForEach(MusicClipMode.allCases) { mode in
-                    Text(mode.displayName).tag(Optional(mode))
+                
+                Divider()
+                    .frame(height: 16)
+
+                HStack(spacing: 4) {
+                    Text("Song duration:")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    
+                    Picker("", selection: $playlistClipMode) {
+                        ForEach(MusicClipMode.allCases) { mode in
+                            Text(mode.displayName).tag(Optional(mode))
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(maxWidth: 520)
                 }
             }
-            .pickerStyle(.segmented)
-            .frame(maxWidth: 520)
         }
     }
     
