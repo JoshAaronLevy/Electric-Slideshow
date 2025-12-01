@@ -24,6 +24,9 @@ struct PlaylistsView: View {
                     notConnectedView
                 }
             }
+            .navigationDestination(for: UUID.self) { playlistId in
+                PlaylistDetailView(playlistId: playlistId)
+            }
             .sheet(isPresented: $showingNewPlaylistFlow) {
                 NewPlaylistFlowView(
                     spotifyAPIService: apiService,
@@ -38,7 +41,9 @@ struct PlaylistsView: View {
     private var playlistsView: some View {
         List {
             ForEach(playlistsStore.playlists) { playlist in
-                PlaylistRow(playlist: playlist)
+                NavigationLink(value: playlist.id) {
+                    PlaylistRow(playlist: playlist)
+                }
             }
             .onDelete { offsets in
                 playlistsStore.deletePlaylist(at: offsets)
