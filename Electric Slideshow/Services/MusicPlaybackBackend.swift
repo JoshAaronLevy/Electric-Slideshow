@@ -85,6 +85,9 @@ protocol MusicPlaybackBackend: AnyObject {
     /// to accept playback commands.
     var isReady: Bool { get }
 
+    /// Indicates whether this backend requires the external Spotify Desktop app to be running.
+    var requiresExternalApp: Bool { get }
+
     /// Called once after creation to allow the backend to perform any
     /// setup work (token fetch, SDK init, etc.).
     ///
@@ -135,6 +138,7 @@ final class NoopPlaybackBackend: MusicPlaybackBackend {
     var onError: ((PlaybackError) -> Void)?
 
     private(set) var isReady: Bool = true
+    var requiresExternalApp: Bool { false }
 
     func initialize() {
         // No-op

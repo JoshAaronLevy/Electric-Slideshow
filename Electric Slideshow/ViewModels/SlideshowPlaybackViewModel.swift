@@ -73,12 +73,12 @@ final class SlideshowPlaybackViewModel: ObservableObject {
     // MARK: - Lifecycle
     
     func startPlayback() async {
+        musicBackend?.initialize()
         await loadAllImages()
         setupPlaybackOrder()
         await startMusic()
         startSlideTimer()
         startPlaybackStateMonitoring()
-        musicBackend?.initialize()
     }
     
     func stopPlayback() async {
@@ -346,11 +346,29 @@ final class SlideshowPlaybackViewModel: ObservableObject {
             return
         }
 
-        // Ensure the Spotify macOS app exists and is launched (if available)
-        let desktopReady = await ensureSpotifyDesktopAvailable()
-        if !desktopReady {
-            // In the “missing app” or “failed to launch” cases, we’ve already set error UI.
-            return
+        // 1. Ensure the playback environment is ready
+        if let backend = musicBackend, !backend.requiresExternalApp {
+            // Internal player: wait for it to be ready
+            print("[SlideshowPlaybackViewModel] Waiting for internal player to be ready...")
+            
+            // Simple polling loop to wait for backend.isReady
+            let timeout = Date().addingTimeInterval(10) // 10s timeout
+            while !backend.isReady && Date() < timeout {
+                try? await Task.sleep(nanoseconds: 200_000_000) // 200ms
+            }
+            
+            if !backend.isReady {
+                print("[SlideshowPlaybackViewModel] Internal player failed to become ready in time.")
+                showingMusicError = true
+                errorMessage = "Internal music player failed to initialize."
+                return
+            }
+        } else {
+            // External player: Ensure the Spotify macOS app exists and is launched
+            let desktopReady = await ensureSpotifyDesktopAvailable()
+            if !desktopReady {
+                return
+            }
         }
 
         do {
@@ -364,8 +382,9 @@ final class SlideshowPlaybackViewModel: ObservableObject {
                 return
             }
 
-            // Prefer an active device, then a “Computer” (this Mac), then just the first one
+            // Prefer the internal player if available, then active, then computer
             let targetDevice =
+                devices.first(where: { $0.name == "Electric Slideshow Internal Player" }) ??
                 devices.first(where: { $0.is_active }) ??
                 devices.first(where: { $0.type.lowercased() == "computer" }) ??
                 devices.first!

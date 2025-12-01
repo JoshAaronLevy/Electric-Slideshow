@@ -51,10 +51,7 @@ private struct SidebarHoverRowModifier: ViewModifier {
         content
             .padding(.horizontal, 2)
             .padding(.vertical, 4)
-            .background(
-                RoundedRectangle(cornerRadius: AppTheme.Sidebar.cornerRadius)
-                    .fill(isHovering ? AppTheme.Sidebar.hoverBackground : .clear)
-            )
+            .background(Color.clear)
     }
 }
 

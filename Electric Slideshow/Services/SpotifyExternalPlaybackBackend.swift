@@ -17,6 +17,7 @@ final class SpotifyExternalPlaybackBackend: MusicPlaybackBackend {
     var onError: ((PlaybackError) -> Void)?
 
     private(set) var isReady: Bool = false
+    var requiresExternalApp: Bool { true }
 
     // MARK: - Dependencies
 

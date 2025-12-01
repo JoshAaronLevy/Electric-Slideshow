@@ -401,6 +401,7 @@ private struct SlideshowTransportControlsRow: View {
             .controlSize(.large)
             .disabled(!hasNext)
         }
+        .cursor(.pointingHand)
         .sidebarHoverRow(isHovering: isHovering)
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
@@ -445,6 +446,7 @@ private struct MusicTransportControlsRow: View {
             .buttonStyle(.bordered)
             .controlSize(.regular)
         }
+        .cursor(.pointingHand)
         .sidebarHoverRow(isHovering: isHovering)
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
