@@ -1,4 +1,4 @@
-You are Antigravity, helping me work on a macOS app written in Swift called **Electric Slideshow** (this task does not have anything to do with the `electric-slideshow-server` repository in this workspace. Only the `Electric Slideshow` app is relevant).
+You are Antigravity, helping me work on a macOS app written in Swift called **Electric Slideshow**.
 
 ## High-Level Context
 
