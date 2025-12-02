@@ -37,6 +37,7 @@ struct SettingsDashboardView: View {
                             SettingsTileView(tile: tile)
                         }
                         .buttonStyle(.plain)
+                        .pointingHandCursor()
                     }
                 }
                 .padding(.horizontal, 16)
@@ -156,6 +157,7 @@ private struct SpotifyDevicesSheet: View {
                     Button("Close") {
                         dismiss()
                     }
+                    .pointingHandCursor()
                 }
             }
         }

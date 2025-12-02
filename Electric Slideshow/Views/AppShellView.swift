@@ -59,9 +59,11 @@ struct AppShellView: View {
             Button("Not Now", role: .cancel) {
                 // User can keep using slideshows without Spotify.
             }
+            .pointingHandCursor()
             Button("Reconnect") {
                 spotifyAuthService.beginAuthentication()
             }
+            .pointingHandCursor()
         } message: {
             Text(spotifyReauthMessage ?? "Your Spotify account is not connected. Would you like to connect now?")
         }
@@ -147,6 +149,7 @@ private struct RequestPermissionView: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .keyboardShortcut(.return, modifiers: [])
+            .pointingHandCursor()
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -176,12 +179,14 @@ private struct PermissionNotificationBar: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
+                .pointingHandCursor()
             } else {
                 Button("View Instructions") {
                     onShowInstructions()
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+                .pointingHandCursor()
             }
         }
         .padding(.horizontal, 16)
@@ -217,6 +222,7 @@ private struct PermissionInstructionsSheet: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .pointingHandCursor()
             }
             .padding(.top, 20)
             
@@ -298,6 +304,7 @@ private struct PermissionInstructionsSheet: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.large)
+                .pointingHandCursor()
             }
             
             Spacer()
@@ -387,6 +394,7 @@ private struct PermissionDeniedView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
+            .pointingHandCursor()
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

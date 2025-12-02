@@ -47,6 +47,7 @@ struct SlideshowCardView: View {
                         } label: {
                             Label("Edit", systemImage: "pencil")
                         }
+                        .pointingHandCursor()
                         
                         Divider()
                         
@@ -55,6 +56,7 @@ struct SlideshowCardView: View {
                         } label: {
                             Label("Delete", systemImage: "trash")
                         }
+                        .pointingHandCursor()
                     } label: {
                         Image(systemName: "ellipsis")
                             .foregroundStyle(.secondary)
@@ -62,6 +64,7 @@ struct SlideshowCardView: View {
                     }
                     .menuStyle(.borderlessButton)
                     .fixedSize()
+                    .pointingHandCursor()
                 }
                 
                 HStack(spacing: 8) {
@@ -141,6 +144,7 @@ struct SlideshowCardView: View {
         }
         .buttonStyle(.plain)
         .transition(.scale.combined(with: .opacity))
+        .pointingHandCursor()
     }
     
     // MARK: - Load Thumbnail

@@ -58,12 +58,14 @@ struct PhotoSelectionView: View {
                 .buttonStyle(.bordered)
                 .disabled(viewModel.selectedCount == viewModel.assets.count || viewModel.assets.isEmpty)
                 .keyboardShortcut("a", modifiers: .command)
+                .pointingHandCursor()
                 
                 Button("Deselect All") {
                     viewModel.clearSelection()
                 }
                 .buttonStyle(.bordered)
                 .disabled(viewModel.selectedCount == 0)
+                .pointingHandCursor()
             }
         }
         .padding(.horizontal, 16)
@@ -187,12 +189,14 @@ struct PhotoSelectionView: View {
                     .buttonStyle(.bordered)
                     .disabled(viewModel.selectedCount == viewModel.assets.count)
                     .keyboardShortcut("a", modifiers: .command)
+                    .pointingHandCursor()
                     
                     Button("Clear") {
                         viewModel.clearSelection()
                     }
                     .buttonStyle(.bordered)
                     .disabled(viewModel.selectedCount == 0)
+                    .pointingHandCursor()
                 }
             }
         }
@@ -252,6 +256,7 @@ private struct AlbumRow: View {
             }
         }
         .padding(.vertical, 2)
+        .pointingHandCursor()
     }
 }
 
@@ -315,12 +320,8 @@ private struct PhotoThumbnailView: View {
         }
         .onHover { hovering in
             isHovered = hovering
-            if hovering {
-                NSCursor.pointingHand.push()
-            } else {
-                NSCursor.pop()
-            }
         }
+        .pointingHandCursor()
         .animation(.easeInOut(duration: 0.2), value: isSelected)
         .task {
             await loadThumbnail()

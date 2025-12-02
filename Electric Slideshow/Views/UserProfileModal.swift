@@ -27,6 +27,7 @@ struct UserProfileModal: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .pointingHandCursor()
             }
             .padding(.top, 20)
             .padding(.horizontal, 20)
@@ -78,6 +79,7 @@ struct UserProfileModal: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
+            .pointingHandCursor()
             
             if let error = spotifyAuthService.authError {
                 HStack(spacing: 8) {
@@ -130,6 +132,7 @@ struct UserProfileModal: View {
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
+                    .pointingHandCursor()
                 }
                 .padding()
             } else if let profile = userProfile {
@@ -178,6 +181,7 @@ struct UserProfileModal: View {
             .controlSize(.large)
             .padding(.horizontal, 40)
             .padding(.bottom, 40)
+            .pointingHandCursor()
         }
         .padding(.top, 20)
     }

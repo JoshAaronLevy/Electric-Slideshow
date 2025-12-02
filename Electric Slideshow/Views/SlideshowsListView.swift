@@ -58,10 +58,12 @@ struct SlideshowsListView: View {
                 Button("Cancel", role: .cancel) {
                     slideshowToDelete = nil
                 }
+                .pointingHandCursor()
                 Button("Delete", role: .destructive) {
                     viewModel.deleteSlideshow(slideshow)
                     slideshowToDelete = nil
                 }
+                .pointingHandCursor()
             } message: { slideshow in
                 Text("Are you sure you want to delete \"\(slideshow.title)\"? This action cannot be undone.")
             }
@@ -83,6 +85,7 @@ struct SlideshowsListView: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(Color.appBlue)
+            .pointingHandCursor()
         }
     }
     
@@ -104,6 +107,7 @@ struct SlideshowsListView: View {
         .buttonStyle(.plain)
         .keyboardShortcut("n", modifiers: .command)
         .padding(24)
+        .pointingHandCursor()
     }
     
     // MARK: - Loading Skeleton View

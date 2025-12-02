@@ -110,6 +110,7 @@ struct PlaylistDetailView: View {
                             Label("Remove Track", systemImage: "trash")
                         }
                         .disabled(selectedRowIndex == nil)
+                        .pointingHandCursor()
                         
                         Button {
                             showingAddTrackSheet = true
@@ -118,6 +119,7 @@ struct PlaylistDetailView: View {
                         } label: {
                             Label("Add Track", systemImage: "plus")
                         }
+                        .pointingHandCursor()
                     }
                 }
                 .sheet(isPresented: $showingAddTrackSheet) {
@@ -149,6 +151,7 @@ struct PlaylistDetailView: View {
                     Image(systemName: "chevron.left")
                 }
                 .buttonStyle(.plain)
+                .pointingHandCursor()
                 
                 Text(playlist.name)
                     .font(.largeTitle)
@@ -184,6 +187,7 @@ struct PlaylistDetailView: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                    .pointingHandCursor()
                     .frame(maxWidth: 520)
                 }
             }
@@ -278,6 +282,7 @@ struct PlaylistDetailView: View {
         .padding(.vertical, 6)
         .padding(.horizontal, 8)
         .contentShape(Rectangle())
+        .pointingHandCursor()
     }
     
     private func clipBadge(for mode: PlaylistTrack.ClipMode) -> some View {
@@ -358,6 +363,7 @@ struct PlaylistDetailView: View {
                 }
                 .pickerStyle(.segmented)
                 .frame(maxWidth: 260)
+                .pointingHandCursor()
                 
                 if row.track.clipMode == .custom {
                     customClipEditor(for: row)
@@ -420,6 +426,7 @@ struct PlaylistDetailView: View {
                     resetToDefault()
                 }
                 .buttonStyle(.borderless)
+                .pointingHandCursor()
             }
             
             if let duration = row.metadata?.durationMs ?? row.track.durationMs {
@@ -464,10 +471,12 @@ struct PlaylistDetailView: View {
                 Button("Cancel") {
                     showingAddTrackSheet = false
                 }
+                .pointingHandCursor()
                 Button("Add") {
                     handleAddTrack()
                 }
                 .buttonStyle(.borderedProminent)
+                .pointingHandCursor()
             }
         }
         .padding()
@@ -497,6 +506,7 @@ struct PlaylistDetailView: View {
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
                     .disabled(!canControlPlayback)
+                    .pointingHandCursor()
                     
                     Button("Mark Start") {
                         Task { await markCurrentPosition(as: .start) }
@@ -504,6 +514,7 @@ struct PlaylistDetailView: View {
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                     .disabled(!canControlPlayback)
+                    .pointingHandCursor()
                     
                     Button("Mark End") {
                         Task { await markCurrentPosition(as: .end) }
@@ -511,6 +522,7 @@ struct PlaylistDetailView: View {
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                     .disabled(!canControlPlayback)
+                    .pointingHandCursor()
                     
                     Button("Back 10s") {
                         Task { await jumpBackward() }
@@ -518,6 +530,7 @@ struct PlaylistDetailView: View {
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                     .disabled(!canControlPlayback || playbackState.trackUri != row.track.uri)
+                    .pointingHandCursor()
                     
                     Button("Preview") {
                         previewClip(for: row)
@@ -525,6 +538,7 @@ struct PlaylistDetailView: View {
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                     .disabled(!canControlPlayback)
+                    .pointingHandCursor()
                 }
                 
                 playbackProgress(for: row)
@@ -561,6 +575,7 @@ struct PlaylistDetailView: View {
                     }
                     .buttonStyle(.borderless)
                     .disabled(!canControlPlayback)
+                    .pointingHandCursor()
                     
                     Spacer()
                     

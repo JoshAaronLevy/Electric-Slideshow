@@ -27,6 +27,7 @@ struct SpotifyDevicesSheetView: View {
                         Button("Try Again") {
                             Task { await viewModel.loadDevices() }
                         }
+                        .pointingHandCursor()
                     }
                     .padding()
                 } else {
@@ -59,6 +60,7 @@ struct SpotifyDevicesSheetView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
+                    .pointingHandCursor()
                 }
             }
         }

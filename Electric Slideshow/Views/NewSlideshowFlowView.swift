@@ -69,6 +69,7 @@ struct NewSlideshowFlowView: View {
                         dismiss()
                     }
                     .keyboardShortcut(.cancelAction)
+                    .pointingHandCursor()
                 }
                 
                 ToolbarItem(placement: .navigation) {
@@ -79,6 +80,7 @@ struct NewSlideshowFlowView: View {
                             Label("Back", systemImage: "chevron.left")
                         }
                         .keyboardShortcut("[", modifiers: [.command])
+                        .pointingHandCursor()
                     }
                 }
                 
@@ -120,6 +122,7 @@ struct NewSlideshowFlowView: View {
                             .font(.caption)
                     }
                     .buttonStyle(.bordered)
+                    .pointingHandCursor()
                 }
                 .padding(.vertical, 4)
             }
@@ -193,6 +196,7 @@ struct NewSlideshowFlowView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    .pointingHandCursor()
                     
                     Divider()
                     
@@ -208,6 +212,7 @@ struct NewSlideshowFlowView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    .pointingHandCursor()
                 }
             } header: {
                 Text("Playback Options")
@@ -231,6 +236,7 @@ struct NewSlideshowFlowView: View {
                     }
                 }
                 .pickerStyle(.menu)
+                .pointingHandCursor()
             } header: {
                 Text("Music")
             } footer: {
@@ -266,6 +272,7 @@ struct NewSlideshowFlowView: View {
             }
             .disabled(photoLibraryVM.selectedCount == 0)
             .keyboardShortcut(.return, modifiers: .command)
+            .pointingHandCursor()
             
         case .settings:
             Button("Save") {
@@ -273,6 +280,7 @@ struct NewSlideshowFlowView: View {
             }
             .disabled(!viewModel.canSave)
             .keyboardShortcut(.return, modifiers: .command)
+            .pointingHandCursor()
         }
     }
     

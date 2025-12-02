@@ -199,17 +199,21 @@ struct SlideshowPlaybackView: View {
                     viewModel.openSpotifyDownloadPage()
                     viewModel.showingMusicError = false
                 }
+                .pointingHandCursor()
                 Button("Dismiss", role: .cancel) {
                     viewModel.showingMusicError = false
                 }
+                .pointingHandCursor()
             } else {
                 // Generic playback error case
                 Button("Continue Without Music") {
                     viewModel.showingMusicError = false
                 }
+                .pointingHandCursor()
                 Button("Dismiss", role: .cancel) {
                     viewModel.showingMusicError = false
                 }
+                .pointingHandCursor()
             }
         } message: {
             Text(viewModel.errorMessage ?? "Unable to start music playback. Make sure Spotify is open on this device.")

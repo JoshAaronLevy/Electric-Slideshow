@@ -124,6 +124,7 @@ struct AppNavigationBar: View {
         }
         .buttonStyle(.plain)
         .help(section.title)
+        .pointingHandCursor()
         .animation(.easeInOut(duration: 0.15), value: isSelected)
     }
 }

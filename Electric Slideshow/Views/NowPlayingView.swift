@@ -271,6 +271,7 @@ private struct NowPlayingSidebarView: View {
                 }
                 .pickerStyle(.segmented)
                 .controlSize(.small)
+                .pointingHandCursor()
             }
             .sidebarCardStyle()
             .animation(.easeInOut(duration: 0.2), value: playbackBridge.clipMode)
@@ -347,6 +348,7 @@ private struct SidebarToggleIconButton: View {
         .buttonStyle(.plain)
         .foregroundStyle(isActive ? Color.accentColor : Color.secondary)
         .contentShape(RoundedRectangle(cornerRadius: 8))
+        .pointingHandCursor()
     }
 }
 
