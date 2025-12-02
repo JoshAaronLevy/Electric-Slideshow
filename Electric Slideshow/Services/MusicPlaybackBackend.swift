@@ -101,7 +101,8 @@ protocol MusicPlaybackBackend: AnyObject {
     /// - Parameters:
     ///   - trackUri: Backend-specific track identifier (e.g. a Spotify URI).
     ///   - startPositionMs: Optional start offset in milliseconds.
-    func playTrack(_ trackUri: String, startPositionMs: Int?)
+    ///   - deviceId: Optional target device if the backend needs to pick one.
+    func playTrack(_ trackUri: String, startPositionMs: Int?, deviceId: String?)
 
     /// Pause playback, if a track is currently playing.
     func pause()
@@ -145,7 +146,7 @@ final class NoopPlaybackBackend: MusicPlaybackBackend {
         onStateChanged?(.idle)
     }
 
-    func playTrack(_ trackUri: String, startPositionMs: Int?) {
+    func playTrack(_ trackUri: String, startPositionMs: Int?, deviceId: String?) {
         // No-op
         onStateChanged?(.idle)
     }

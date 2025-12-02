@@ -120,7 +120,7 @@ final class SpotifyInternalPlaybackBackend: MusicPlaybackBackend {
 
     // MARK: - MusicPlaybackBackend commands
 
-    func playTrack(_ trackUri: String, startPositionMs: Int?) {
+    func playTrack(_ trackUri: String, startPositionMs: Int?, deviceId: String?) {
         // Log intent but ignore args for now as requested
         print("[SpotifyInternalPlaybackBackend] playTrack requested for \(trackUri) (pos: \(startPositionMs ?? 0)ms). Resuming existing context.")
         player.play()

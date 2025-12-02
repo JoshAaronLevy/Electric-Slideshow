@@ -33,10 +33,14 @@ final class SpotifyExternalPlaybackBackend: MusicPlaybackBackend {
         isReady = true
     }
 
-    func playTrack(_ trackUri: String, startPositionMs: Int?) {
+    func playTrack(_ trackUri: String, startPositionMs: Int?, deviceId: String?) {
         Task {
             do {
-                try await apiService.startPlayback(trackURIs: [trackUri], startPositionMs: startPositionMs)
+                try await apiService.startPlayback(
+                    trackURIs: [trackUri],
+                    deviceId: deviceId,
+                    startPositionMs: startPositionMs
+                )
                 let state = PlaybackState(
                     trackUri: trackUri,
                     trackName: nil,

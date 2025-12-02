@@ -20,6 +20,8 @@ struct PlaylistDetailView: View {
     
     @State private var playbackBackend: MusicPlaybackBackend?
     @State private var playbackState: PlaybackState = .idle
+    @State private var playbackDeviceId: String?
+    @State private var playbackProgressTimer: Timer?
     @State private var previewTimer: Timer?
     @State private var playbackMessage: String?
     @State private var showingAddTrackSheet = false
@@ -93,6 +95,13 @@ struct PlaylistDetailView: View {
                 .onChange(of: selectedRowIndex) { _ in
                     syncInspectorFields()
                 }
+                .onChange(of: playbackState.isPlaying) { isPlaying in
+                    if isPlaying {
+                        startPlaybackProgressTimer()
+                    } else {
+                        stopPlaybackProgressTimer()
+                    }
+                }
                 .toolbar {
                     ToolbarItemGroup {
                         Button {
@@ -113,6 +122,10 @@ struct PlaylistDetailView: View {
                 }
                 .sheet(isPresented: $showingAddTrackSheet) {
                     addTrackSheet
+                }
+                .onDisappear {
+                    stopPlaybackProgressTimer()
+                    previewTimer?.invalidate()
                 }
             } else {
                 ContentUnavailableView {
@@ -499,6 +512,13 @@ struct PlaylistDetailView: View {
                     .controlSize(.small)
                     .disabled(!canControlPlayback)
                     
+                    Button("Back 10s") {
+                        Task { await jumpBackward() }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(!canControlPlayback || playbackState.trackUri != row.track.uri)
+                    
                     Button("Preview") {
                         previewClip(for: row)
                     }
@@ -507,9 +527,45 @@ struct PlaylistDetailView: View {
                     .disabled(!canControlPlayback)
                 }
                 
+                playbackProgress(for: row)
+                
                 if let message = playbackMessage {
                     Text(message)
                         .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func playbackProgress(for row: PlaylistTrackRow) -> some View {
+        if playbackState.trackUri == row.track.uri, playbackState.durationMs > 0 {
+            VStack(alignment: .leading, spacing: 6) {
+                ProgressView(
+                    value: Double(playbackState.positionMs),
+                    total: Double(playbackState.durationMs)
+                )
+                
+                HStack {
+                    Text(formatTimestamp(ms: playbackState.positionMs))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    
+                    Spacer()
+                    
+                    Button {
+                        Task { await jumpBackward() }
+                    } label: {
+                        Label("Back 10s", systemImage: "gobackward.10")
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(!canControlPlayback)
+                    
+                    Spacer()
+                    
+                    Text(formatTimestamp(ms: playbackState.durationMs))
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -582,6 +638,7 @@ struct PlaylistDetailView: View {
             backend.onStateChanged = { state in
                 DispatchQueue.main.async {
                     self.playbackState = state
+                    state.isPlaying ? self.startPlaybackProgressTimer() : self.stopPlaybackProgressTimer()
                 }
             }
             backend.onError = { error in
@@ -597,13 +654,155 @@ struct PlaylistDetailView: View {
     }
     
     private func togglePlayPause(for row: PlaylistTrackRow) {
+        preparePlaybackBackendIfNeeded()
         guard let backend = playbackBackend else { return }
+        
+        previewTimer?.invalidate()
         
         if playbackState.isPlaying {
             backend.pause()
+            stopPlaybackProgressTimer()
+            playbackState = PlaybackState(
+                trackUri: playbackState.trackUri,
+                trackName: playbackState.trackName,
+                artistName: playbackState.artistName,
+                positionMs: playbackState.positionMs,
+                durationMs: playbackState.durationMs,
+                isPlaying: false,
+                isBuffering: playbackState.isBuffering
+            )
+            Task { await refreshPlaybackState() }
         } else {
-            backend.playTrack(row.track.uri, startPositionMs: row.track.customStartMs ?? 0)
+            Task {
+                guard backend.isReady else {
+                    await MainActor.run { playbackMessage = "Player is starting up…" }
+                    return
+                }
+                guard let deviceId = await ensurePlaybackDevice() else { return }
+                let startMs = row.track.customStartMs ?? 0
+                backend.playTrack(row.track.uri, startPositionMs: startMs, deviceId: deviceId)
+                await MainActor.run {
+                    playbackState = PlaybackState(
+                        trackUri: row.track.uri,
+                        trackName: row.title,
+                        artistName: primaryArtist(for: row),
+                        positionMs: startMs,
+                        durationMs: row.metadata?.durationMs ?? row.track.durationMs ?? 0,
+                        isPlaying: true,
+                        isBuffering: false
+                    )
+                    startPlaybackProgressTimer()
+                }
+                await refreshPlaybackState()
+            }
         }
+    }
+    
+    private func startPlaybackProgressTimer() {
+        playbackProgressTimer?.invalidate()
+        playbackProgressTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            Task { await self.refreshPlaybackState() }
+        }
+    }
+    
+    private func stopPlaybackProgressTimer() {
+        playbackProgressTimer?.invalidate()
+        playbackProgressTimer = nil
+    }
+    
+    @MainActor
+    private func refreshPlaybackState() async {
+        guard spotifyAuthService.isAuthenticated else { return }
+        
+        do {
+            if let playback = try await apiService.getCurrentPlaybackState(),
+               let item = playback.item {
+                playbackState = PlaybackState(
+                    trackUri: item.uri,
+                    trackName: item.name,
+                    artistName: item.artists.first?.name,
+                    positionMs: playback.progressMs ?? 0,
+                    durationMs: item.durationMs,
+                    isPlaying: playback.isPlaying,
+                    isBuffering: false
+                )
+            } else {
+                playbackState = .idle
+            }
+        } catch {
+            // Avoid spamming the UI on transient failures.
+        }
+    }
+    
+    private func ensurePlaybackDevice() async -> String? {
+        if let existing = playbackDeviceId {
+            return existing
+        }
+        
+        guard spotifyAuthService.isAuthenticated else {
+            await MainActor.run {
+                playbackMessage = "Connect Spotify to control playback."
+            }
+            return nil
+        }
+        
+        do {
+            let devices = try await apiService.fetchAvailableDevices()
+            guard !devices.isEmpty, let target = selectPreferredDevice(from: devices) else {
+                await MainActor.run {
+                    playbackMessage = "Open Spotify on this Mac or phone, then try again."
+                }
+                return nil
+            }
+            
+            await MainActor.run {
+                playbackDeviceId = target.deviceId
+            }
+            return target.deviceId
+        } catch {
+            await MainActor.run {
+                playbackMessage = "Could not find a Spotify playback device."
+            }
+            return nil
+        }
+    }
+    
+    private func selectPreferredDevice(from devices: [SpotifyDevice]) -> SpotifyDevice? {
+        devices.first(where: { $0.name == "Electric Slideshow Internal Player" }) ??
+        devices.first(where: { $0.is_active }) ??
+        devices.first(where: { $0.type.lowercased() == "computer" }) ??
+        devices.first
+    }
+    
+    private func primaryArtist(for row: PlaylistTrackRow) -> String? {
+        if let artists = row.metadata?.artistNames, !artists.isEmpty {
+            return artists
+        }
+        return row.track.artist
+    }
+    
+    private func jumpBackward(seconds: Int = 10) async {
+        guard let backend = playbackBackend, backend.isReady else {
+            playbackMessage = "Player not ready."
+            return
+        }
+        guard playbackState.durationMs > 0 else { return }
+        
+        let deltaMs = seconds * 1000
+        let newPosition = max(playbackState.positionMs - deltaMs, 0)
+        backend.seek(to: newPosition)
+        await MainActor.run {
+            playbackState = PlaybackState(
+                trackUri: playbackState.trackUri,
+                trackName: playbackState.trackName,
+                artistName: playbackState.artistName,
+                positionMs: newPosition,
+                durationMs: playbackState.durationMs,
+                isPlaying: playbackState.isPlaying,
+                isBuffering: playbackState.isBuffering
+            )
+        }
+        await refreshPlaybackState()
     }
     
     private enum MarkPositionTarget {
@@ -654,6 +853,7 @@ struct PlaylistDetailView: View {
     }
     
     private func previewClip(for row: PlaylistTrackRow) {
+        preparePlaybackBackendIfNeeded()
         guard let backend = playbackBackend else {
             playbackMessage = "Player not initialized."
             return
@@ -677,31 +877,43 @@ struct PlaylistDetailView: View {
             endMs = defaultClipEndMs(for: row) ?? (row.metadata?.durationMs ?? row.track.durationMs ?? 0)
         }
         
+        let trackDuration = row.metadata?.durationMs ?? row.track.durationMs ?? endMs
         let duration = max(endMs - startMs, minCustomClipDeltaMs)
-        backend.playTrack(row.track.uri, startPositionMs: startMs)
-        playbackState = PlaybackState(
-            trackUri: row.track.uri,
-            trackName: row.title,
-            artistName: nil,
-            positionMs: startMs,
-            durationMs: endMs,
-            isPlaying: true,
-            isBuffering: false
-        )
         
-        previewTimer = Timer.scheduledTimer(withTimeInterval: Double(duration) / 1000.0, repeats: false) { _ in
-            backend.pause()
-            DispatchQueue.main.async {
-                self.playbackState = PlaybackState(
+        Task {
+            guard let deviceId = await ensurePlaybackDevice() else { return }
+            backend.playTrack(row.track.uri, startPositionMs: startMs, deviceId: deviceId)
+            
+            await MainActor.run {
+                playbackState = PlaybackState(
                     trackUri: row.track.uri,
                     trackName: row.title,
-                    artistName: nil,
-                    positionMs: endMs,
-                    durationMs: endMs,
-                    isPlaying: false,
+                    artistName: primaryArtist(for: row),
+                    positionMs: startMs,
+                    durationMs: trackDuration,
+                    isPlaying: true,
                     isBuffering: false
                 )
+                startPlaybackProgressTimer()
+                
+                previewTimer = Timer.scheduledTimer(withTimeInterval: Double(duration) / 1000.0, repeats: false) { _ in
+                    backend.pause()
+                    DispatchQueue.main.async {
+                        self.playbackState = PlaybackState(
+                            trackUri: row.track.uri,
+                            trackName: row.title,
+                            artistName: primaryArtist(for: row),
+                            positionMs: min(endMs, trackDuration),
+                            durationMs: trackDuration,
+                            isPlaying: false,
+                            isBuffering: false
+                        )
+                        self.stopPlaybackProgressTimer()
+                    }
+                }
             }
+            
+            await refreshPlaybackState()
         }
     }
     
