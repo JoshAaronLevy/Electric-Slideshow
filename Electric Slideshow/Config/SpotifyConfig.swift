@@ -15,6 +15,9 @@ struct SpotifyConfig {
     static let internalPlayerURL = URL(string: "https://electric-slideshow-server.onrender.com/internal-player")!
     
     static let scopes = [
+        "streaming",
+        "user-read-email",
+        "user-read-private",
         "playlist-read-private",
         "playlist-read-collaborative",
         "user-library-read",

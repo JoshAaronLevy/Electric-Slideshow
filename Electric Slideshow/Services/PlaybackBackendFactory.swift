@@ -22,7 +22,10 @@ struct PlaybackBackendFactory {
 
     /// Global default mode for the app. Keep this `.externalDevice`
     /// until the internal player is fully implemented and tested.
-    static let defaultMode: PlaybackBackendMode = .externalDevice
+    static let defaultMode: PlaybackBackendMode = .internalWebPlayer
+
+    /// Cached internal backend so we can pre-warm the web player once and reuse it.
+    private static var sharedInternalBackend: SpotifyInternalPlaybackBackend?
 
     /// Creates a music playback backend for the given mode.
     ///
@@ -47,8 +50,26 @@ struct PlaybackBackendFactory {
         case .internalWebPlayer:
             // Internal web player: runs the Spotify Web Playback SDK in a WKWebView.
             // Still experimental; commands are wired through InternalSpotifyPlayer.
+            if let cached = sharedInternalBackend {
+                return cached
+            }
             let internalPlayer = InternalSpotifyPlayer()
-            return SpotifyInternalPlaybackBackend(player: internalPlayer, apiService: apiService)
+            let backend = SpotifyInternalPlaybackBackend(player: internalPlayer, apiService: apiService)
+            sharedInternalBackend = backend
+            return backend
         }
+    }
+
+    /// Pre-warm the internal player so it can be ready before a slideshow starts.
+    /// This does not start playback; it only initializes the WKWebView + SDK.
+    @discardableResult
+    static func prewarmInternalBackend(spotifyAPIService: SpotifyAPIService?) -> MusicPlaybackBackend? {
+        guard let apiService = spotifyAPIService else { return nil }
+        if let cached = sharedInternalBackend { return cached }
+        let internalPlayer = InternalSpotifyPlayer()
+        let backend = SpotifyInternalPlaybackBackend(player: internalPlayer, apiService: apiService)
+        sharedInternalBackend = backend
+        backend.initialize()
+        return backend
     }
 }

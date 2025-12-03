@@ -16,6 +16,7 @@ struct AppShellView: View {
     @StateObject private var spotifyAPIService = SpotifyAPIService(authService: SpotifyAuthService.shared)
     @State private var showingSpotifyReauthAlert = false
     @State private var spotifyReauthMessage: String?
+    @State private var prewarmedPlaybackBackend: MusicPlaybackBackend?
 
     init(photoService: PhotoLibraryService) {
         _permissionVM = StateObject(wrappedValue: PermissionViewModel(photoService: photoService))
@@ -54,6 +55,14 @@ struct AppShellView: View {
             Task {
                 await validateSpotifyConnectionOnLaunch()
             }
+
+            // If already authenticated at launch, pre-warm the internal player
+            prewarmInternalPlayerIfNeeded()
+        }
+        .onChange(of: spotifyAuthService.isAuthenticated) { isAuthed in
+            if isAuthed {
+                prewarmInternalPlayerIfNeeded()
+            }
         }
         .alert("Spotify Connection Issue", isPresented: $showingSpotifyReauthAlert) {
             Button("Not Now", role: .cancel) {
@@ -70,6 +79,13 @@ struct AppShellView: View {
     }
 
     // MARK: - Spotify Connection Validation
+
+    /// Initializes the internal web player early so it is ready when a slideshow starts.
+    private func prewarmInternalPlayerIfNeeded() {
+        guard spotifyAuthService.isAuthenticated else { return }
+        guard prewarmedPlaybackBackend == nil else { return }
+        prewarmedPlaybackBackend = PlaybackBackendFactory.prewarmInternalBackend(spotifyAPIService: spotifyAPIService)
+    }
 
     private func validateSpotifyConnectionOnLaunch() async {
         // Only bother checking if we already *think* we’re authenticated.

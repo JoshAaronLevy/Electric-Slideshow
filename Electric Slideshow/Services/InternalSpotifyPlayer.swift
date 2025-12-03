@@ -172,6 +172,29 @@ final class InternalSpotifyPlayer: NSObject, WKScriptMessageHandler {
         webView.load(request)
     }
 
+    /// Ensure the page defines the SDK ready hook even if the SDK script loads
+    /// before INTERNAL_PLAYER sets its callback.
+    func ensureSDKReadyBridge() {
+        let script = """
+        (function() {
+            const ensureReady = () => {
+                if (window.INTERNAL_PLAYER && window.Spotify && window.Spotify.Player) {
+                    window.INTERNAL_PLAYER._sdkReady = true;
+                    window.INTERNAL_PLAYER._maybeCreatePlayer();
+                }
+            };
+            window.onSpotifyWebPlaybackSDKReady = () => {
+                console.log('[INTERNAL_PLAYER] (bridge) SDK ready fired');
+                ensureReady();
+            };
+            if (window.Spotify && window.Spotify.Player) {
+                ensureReady();
+            }
+        })();
+        """
+        evaluateJavaScript(script)
+    }
+
     /// Evaluate arbitrary JS in the web view. We'll use this later
     /// to call functions like playerPlayTrack(), playerPause(), etc.
     func evaluateJavaScript(_ script: String) {
@@ -182,6 +205,83 @@ final class InternalSpotifyPlayer: NSObject, WKScriptMessageHandler {
                 print("[InternalSpotifyPlayer] JS result: \(result)")
             }
         }
+    }
+
+    /// Installs debug hooks inside the page to surface connect/ready issues.
+    func installDebugHooks() {
+        let script = """
+        (function() {
+            if (!window.INTERNAL_PLAYER) { return 'no_internal_player'; }
+            if (window.INTERNAL_PLAYER.__ES_HOOKS_INSTALLED) { return 'already_installed'; }
+            window.INTERNAL_PLAYER.__ES_HOOKS_INSTALLED = true;
+
+            const post = (evt) => {
+                try {
+                    window.webkit?.messageHandlers?.playerEvent?.postMessage(evt);
+                } catch (e) {
+                    console.log('[INTERNAL_PLAYER][hook] failed to post event', e);
+                }
+            };
+
+            const wrapMaybeCreate = (original) => {
+                return function() {
+                    const result = original.apply(window.INTERNAL_PLAYER, arguments);
+                    const p = window.INTERNAL_PLAYER._player;
+                    if (p && !p.__ES_DEBUG_INSTALLED) {
+                        p.__ES_DEBUG_INSTALLED = true;
+                        p.addListener('ready', ({ device_id }) => post({ type: 'ready', deviceId: device_id }));
+                        p.addListener('not_ready', ({ device_id }) => post({ type: 'notReady', deviceId: device_id }));
+                        p.addListener('initialization_error', ({ message }) => post({ type: 'error', code: 'initialization_error', message }));
+                        p.addListener('authentication_error', ({ message }) => post({ type: 'error', code: 'authentication_error', message }));
+                        p.addListener('account_error', ({ message }) => post({ type: 'error', code: 'account_error', message }));
+                        p.addListener('playback_error', ({ message }) => post({ type: 'error', code: 'playback_error', message }));
+
+                        if (p.connect && !p.__ES_CONNECT_WRAPPED) {
+                            p.__ES_CONNECT_WRAPPED = true;
+                            const originalConnect = p.connect.bind(p);
+                            p.connect = function() {
+                                try {
+                                    const pr = originalConnect();
+                                    if (pr && typeof pr.then === 'function') {
+                                        pr.then(ok => post({ type: 'connectResult', message: ok ? 'connected' : 'failed' }))
+                                          .catch(err => post({ type: 'error', code: 'connect_failed', message: String(err) }));
+                                    }
+
+                                    // Fallback: poll internal SDK id if connect promise never resolves.
+                                    if (!p.__ES_ID_POLL) {
+                                        p.__ES_ID_POLL = setInterval(() => {
+                                            try {
+                                                const id = p._options?.id;
+                                                if (id) {
+                                                    post({ type: 'ready', deviceId: id });
+                                                    clearInterval(p.__ES_ID_POLL);
+                                                    p.__ES_ID_POLL = null;
+                                                }
+                                            } catch (_) { /* ignore */ }
+                                        }, 500);
+                                    }
+                                    return pr;
+                                } catch (err) {
+                                    post({ type: 'error', code: 'connect_throw', message: String(err) });
+                                    throw err;
+                                }
+                            };
+                        }
+                    }
+                    return result;
+                };
+            };
+
+            if (typeof window.INTERNAL_PLAYER._maybeCreatePlayer === 'function') {
+                window.INTERNAL_PLAYER._maybeCreatePlayer = wrapMaybeCreate(window.INTERNAL_PLAYER._maybeCreatePlayer);
+            }
+
+            // Immediately trigger creation attempt in case SDK+token already loaded.
+            window.INTERNAL_PLAYER._maybeCreatePlayer();
+            return 'hooks_installed';
+        })();
+        """
+        evaluateJavaScript(script)
     }
 
     // MARK: - WKScriptMessageHandler
