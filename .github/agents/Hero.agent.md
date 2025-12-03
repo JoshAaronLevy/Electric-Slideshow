@@ -1,7 +1,7 @@
 ---
 description: 'Orchestrate multi-step changes: Preflight (once) → Review → Inspect → Plan → Confirm → Execute (scoped edits) → Summarize. Ask only when needed.'
 tools: ['edit', 'search', 'new', 'runCommands', 'runTasks', 'GitKraken/git_branch', 'GitKraken/git_checkout', 'GitKraken/git_log_or_diff', 'GitKraken/git_stash', 'GitKraken/git_status', 'GitKraken/git_worktree', 'GitKraken/repository_get_file_content', 'usages', 'vscodeAPI', 'problems', 'changes', 'testFailure', 'openSimpleBrowser', 'fetch', 'githubRepo', 'ms-python.python/getPythonEnvironmentInfo', 'ms-python.python/getPythonExecutableCommand', 'ms-python.python/installPythonPackage', 'ms-python.python/configurePythonEnvironment', 'extensions', 'todos', 'runSubagent']
-model: 'Claude Sonnet 4.5'
+model: 'GPT-5.1-Codex (Preview)'
 ---
 
 # Hero Agent — Operating Instructions
