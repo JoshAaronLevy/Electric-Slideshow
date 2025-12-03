@@ -21,10 +21,15 @@ Goal: verify that the Spotify Web Playback SDK works inside Chromium Embedded Fr
    - Opens `cefclient` pointing to `https://electric-slideshow-server.onrender.com/internal-player`.
    - Enables remote debugging on port `9223` for DevTools access.
 
-3. **Inject Spotify token**
-   - In the CEF window, press `Cmd+Option+I` (or open Chrome DevTools via `http://localhost:9223` from Chrome) to get a console.
-   - Run: `INTERNAL_PLAYER.setAccessToken('YOUR_SPOTIFY_ACCESS_TOKEN')`.
-   - Watch the console for `connectResult: connected` and the device ID.
+3. **Inject Spotify token (automated)**
+   ```bash
+   cd Prototypes/CEFPlayer
+   npm install          # first run only
+   SPOTIFY_ACCESS_TOKEN="<token>" npm run inject-token
+   ```
+   - The script uses Chrome DevTools Protocol to call `INTERNAL_PLAYER.setAccessToken` inside cefclient.
+   - `inject_token.js` waits for the target page to be ready, so you can run it immediately after launching the prototype.
+   - Watch your terminal for `token_sent` and the CEF console for `connectResult: connected`.
 
 4. **Capture metrics**
    - Note cold-start duration (time from running script to `Spotify Web Playback SDK loaded`).
@@ -46,3 +51,4 @@ Goal: verify that the Spotify Web Playback SDK works inside Chromium Embedded Fr
 - If the window stays blank, ensure the backend URL is reachable (Render deployed app status).
 - If `setAccessToken` errors, confirm the token has `streaming`, `user-read-playback-state`, `user-modify-playback-state` scopes.
 - For Widevine failures, collect logs and confirm you’re running the official CEF build (not the sample app built with Debug configs).
+- `inject_token.js` connects to `localhost:9223`; if you changed the debug port, export `CEF_DEVTOOLS_PORT=<port>` before running the script.

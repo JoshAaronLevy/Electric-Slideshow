@@ -1,0 +1,12 @@
+{
+  "name": "cefplayer-prototype",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "inject-token": "node inject_token.js"
+  },
+  "dependencies": {
+    "chrome-remote-interface": "^0.33.0"
+  }
+}
