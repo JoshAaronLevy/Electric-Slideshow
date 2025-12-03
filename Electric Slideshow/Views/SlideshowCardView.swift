@@ -25,7 +25,6 @@ struct SlideshowCardView: View {
             }
             .aspectRatio(16/9, contentMode: .fill)
             .background(Color.gray.opacity(0.2))
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .onHover { hovering in
                 withAnimation(.easeInOut(duration: 0.15)) {
                     isHovered = hovering
@@ -48,6 +47,7 @@ struct SlideshowCardView: View {
                         } label: {
                             Label("Edit", systemImage: "pencil")
                         }
+                        .pointingHandCursor()
                         
                         Divider()
                         
@@ -56,6 +56,7 @@ struct SlideshowCardView: View {
                         } label: {
                             Label("Delete", systemImage: "trash")
                         }
+                        .pointingHandCursor()
                     } label: {
                         Image(systemName: "ellipsis")
                             .foregroundStyle(.secondary)
@@ -63,6 +64,7 @@ struct SlideshowCardView: View {
                     }
                     .menuStyle(.borderlessButton)
                     .fixedSize()
+                    .pointingHandCursor()
                 }
                 
                 HStack(spacing: 8) {
@@ -97,9 +99,12 @@ struct SlideshowCardView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
         }
-        .background(Color(nsColor: .controlBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
+        .padding(16) // Generous margins around each card
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color(nsColor: .windowBackgroundColor))
+        )
+        .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
         .task {
             await loadThumbnail()
         }
@@ -139,6 +144,7 @@ struct SlideshowCardView: View {
         }
         .buttonStyle(.plain)
         .transition(.scale.combined(with: .opacity))
+        .pointingHandCursor()
     }
     
     // MARK: - Load Thumbnail

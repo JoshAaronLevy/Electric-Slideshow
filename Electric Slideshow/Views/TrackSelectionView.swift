@@ -31,6 +31,7 @@ struct TrackSelectionView: View {
                         .tag(LibraryTab.search)
                 }
                 .pickerStyle(.segmented)
+                .pointingHandCursor()
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
                 .background(Color(nsColor: .controlBackgroundColor))
@@ -126,6 +127,7 @@ struct TrackSelectionView: View {
                     Label("Back", systemImage: "chevron.left")
                 }
                 .buttonStyle(.bordered)
+                .pointingHandCursor()
                 
                 Image(systemName: "music.note.list")
                     .font(.title2)
@@ -241,6 +243,7 @@ private struct PlaylistCard: View {
         .onHover { hovering in
             isHovered = hovering
         }
+        .pointingHandCursor()
     }
 }
 
@@ -260,6 +263,7 @@ struct TrackRow: View {
                     .font(.title3)
             }
             .buttonStyle(.plain)
+            .pointingHandCursor()
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(track.name)
@@ -275,5 +279,6 @@ struct TrackRow: View {
         .onTapGesture {
             onToggle()
         }
+        .pointingHandCursor()
     }
 }

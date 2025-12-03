@@ -13,23 +13,21 @@ struct SlideshowsListView: View {
     @EnvironmentObject private var photoService: PhotoLibraryService
     @EnvironmentObject private var spotifyAuthService: SpotifyAuthService
     @EnvironmentObject private var playlistsStore: PlaylistsStore
+
+    /// Callback into the app shell to start playback & navigate to Now Playing
+    let onStartPlayback: (Slideshow) -> Void
+
     @State private var showingNewSlideshowFlow = false
     @State private var slideshowToEdit: Slideshow?
     @State private var slideshowToDelete: Slideshow?
-    @State private var activeSlideshowForPlayback: Slideshow?
-    @StateObject private var spotifyAPIService: SpotifyAPIService
     
     // 4-column grid layout
     private let columns = [
-        GridItem(.flexible(), spacing: 16),
-        GridItem(.flexible(), spacing: 16),
-        GridItem(.flexible(), spacing: 16),
-        GridItem(.flexible(), spacing: 16)
+        GridItem(.flexible(), spacing: 24),
+        GridItem(.flexible(), spacing: 24),
+        GridItem(.flexible(), spacing: 24),
+        GridItem(.flexible(), spacing: 24)
     ]
-    
-    init() {
-        self._spotifyAPIService = StateObject(wrappedValue: SpotifyAPIService(authService: SpotifyAuthService.shared))
-    }
     
     var body: some View {
         NavigationStack {
@@ -60,20 +58,14 @@ struct SlideshowsListView: View {
                 Button("Cancel", role: .cancel) {
                     slideshowToDelete = nil
                 }
+                .pointingHandCursor()
                 Button("Delete", role: .destructive) {
                     viewModel.deleteSlideshow(slideshow)
                     slideshowToDelete = nil
                 }
+                .pointingHandCursor()
             } message: { slideshow in
                 Text("Are you sure you want to delete \"\(slideshow.title)\"? This action cannot be undone.")
-            }
-            .sheet(item: $activeSlideshowForPlayback) { slideshow in
-                SlideshowPlaybackView(
-                    slideshow: slideshow,
-                    photoService: photoService,
-                    spotifyAPIService: spotifyAuthService.isAuthenticated ? spotifyAPIService : nil,
-                    playlistsStore: playlistsStore
-                )
             }
         }
     }
@@ -93,6 +85,7 @@ struct SlideshowsListView: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(Color.appBlue)
+            .pointingHandCursor()
         }
     }
     
@@ -114,18 +107,84 @@ struct SlideshowsListView: View {
         .buttonStyle(.plain)
         .keyboardShortcut("n", modifiers: .command)
         .padding(24)
+        .pointingHandCursor()
+    }
+    
+    // MARK: - Loading Skeleton View
+    
+    private var loadingSkeletonView: some View {
+        ScrollView {
+            LazyVGrid(columns: columns, spacing: 24) {
+                ForEach(0..<8) { _ in
+                    skeletonCardView
+                        .border(.red)
+                        .padding(8) // Add padding around each card to create visible spacing
+                }
+            }
+            .padding(32)
+        }
+    }
+    
+    private var skeletonCardView: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Skeleton thumbnail
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.gray.opacity(0.3))
+                .aspectRatio(16/9, contentMode: .fill)
+                .overlay(
+                    ProgressView()
+                        .scaleEffect(0.8)
+                )
+            
+            // Skeleton metadata
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(height: 16)
+                    
+                    Spacer()
+                    
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(width: 20, height: 20)
+                }
+                
+                HStack(spacing: 8) {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(width: 60, height: 12)
+                    
+                    Text("•")
+                        .foregroundStyle(.tertiary)
+                        .font(.caption)
+                    
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(width: 80, height: 12)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color(nsColor: .windowBackgroundColor))
+        )
+        .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
     }
     
     // MARK: - Grid View
     
     private var slideshowsGrid: some View {
         ScrollView {
-            LazyVGrid(columns: columns, spacing: 16) {
+            LazyVGrid(columns: columns, spacing: 24) {
                 ForEach(viewModel.slideshows) { slideshow in
                     SlideshowCardView(
                         slideshow: slideshow,
                         onPlay: {
-                            activeSlideshowForPlayback = slideshow
+                            onStartPlayback(slideshow)
                         },
                         onEdit: {
                             slideshowToEdit = slideshow
@@ -134,6 +193,7 @@ struct SlideshowsListView: View {
                             slideshowToDelete = slideshow
                         }
                     )
+                    .padding(8) // Add padding around each card to create visible spacing
                 }
             }
             .padding(24)
@@ -145,5 +205,8 @@ struct SlideshowsListView: View {
 }
 
 #Preview {
-    SlideshowsListView()
+    SlideshowsListView { _ in }
+        .environmentObject(PhotoLibraryService())
+        .environmentObject(SpotifyAuthService.shared)
+        .environmentObject(PlaylistsStore())
 }

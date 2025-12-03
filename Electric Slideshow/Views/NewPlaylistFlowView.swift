@@ -36,6 +36,7 @@ struct NewPlaylistFlowView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                    .pointingHandCursor()
                 }
                 
                 ToolbarItem(placement: .navigation) {
@@ -45,6 +46,7 @@ struct NewPlaylistFlowView: View {
                         } label: {
                             Label("Back", systemImage: "chevron.left")
                         }
+                        .pointingHandCursor()
                     }
                 }
                 
@@ -78,6 +80,7 @@ struct NewPlaylistFlowView: View {
                         currentStep = .trackSelection
                     }
                     .buttonStyle(.bordered)
+                    .pointingHandCursor()
                 }
             }
             
@@ -99,12 +102,14 @@ struct NewPlaylistFlowView: View {
                 currentStep = .settings
             }
             .disabled(musicLibraryVM.selectedTrackURIs.isEmpty)
+            .pointingHandCursor()
             
         case .settings:
             Button("Save") {
                 savePlaylist()
             }
             .disabled(!viewModel.canSave)
+            .pointingHandCursor()
         }
     }
     

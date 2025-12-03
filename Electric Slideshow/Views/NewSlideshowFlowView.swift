@@ -23,7 +23,15 @@ struct NewSlideshowFlowView: View {
     init(photoService: PhotoLibraryService, editingSlideshow: Slideshow? = nil, onSave: @escaping (Slideshow) -> Void) {
         self.onSave = onSave
         self._viewModel = StateObject(wrappedValue: NewSlideshowViewModel(editingSlideshow: editingSlideshow))
-        self._photoLibraryVM = StateObject(wrappedValue: PhotoLibraryViewModel(photoService: photoService))
+        
+        // Pre-select existing photos when editing
+        let preselectedAssetIds: Set<String>
+        if let existingSlideshow = editingSlideshow {
+            preselectedAssetIds = Set(existingSlideshow.photos.map { $0.localIdentifier })
+        } else {
+            preselectedAssetIds = []
+        }
+        self._photoLibraryVM = StateObject(wrappedValue: PhotoLibraryViewModel(photoService: photoService, preselectedAssetIds: preselectedAssetIds))
         
         // Initialize music selection from editing slideshow
         if let playlistId = editingSlideshow?.settings.linkedPlaylistId {
@@ -61,6 +69,7 @@ struct NewSlideshowFlowView: View {
                         dismiss()
                     }
                     .keyboardShortcut(.cancelAction)
+                    .pointingHandCursor()
                 }
                 
                 ToolbarItem(placement: .navigation) {
@@ -71,6 +80,7 @@ struct NewSlideshowFlowView: View {
                             Label("Back", systemImage: "chevron.left")
                         }
                         .keyboardShortcut("[", modifiers: [.command])
+                        .pointingHandCursor()
                     }
                 }
                 
@@ -79,7 +89,7 @@ struct NewSlideshowFlowView: View {
                 }
             }
         }
-        .frame(minWidth: 800, minHeight: 600)
+        .frame(minWidth: 950, minHeight: 600)
     }
     
     // MARK: - Settings Step
@@ -112,6 +122,7 @@ struct NewSlideshowFlowView: View {
                             .font(.caption)
                     }
                     .buttonStyle(.bordered)
+                    .pointingHandCursor()
                 }
                 .padding(.vertical, 4)
             }
@@ -185,6 +196,7 @@ struct NewSlideshowFlowView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    .pointingHandCursor()
                     
                     Divider()
                     
@@ -200,6 +212,7 @@ struct NewSlideshowFlowView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    .pointingHandCursor()
                 }
             } header: {
                 Text("Playback Options")
@@ -223,6 +236,7 @@ struct NewSlideshowFlowView: View {
                     }
                 }
                 .pickerStyle(.menu)
+                .pointingHandCursor()
             } header: {
                 Text("Music")
             } footer: {
@@ -258,6 +272,7 @@ struct NewSlideshowFlowView: View {
             }
             .disabled(photoLibraryVM.selectedCount == 0)
             .keyboardShortcut(.return, modifiers: .command)
+            .pointingHandCursor()
             
         case .settings:
             Button("Save") {
@@ -265,6 +280,7 @@ struct NewSlideshowFlowView: View {
             }
             .disabled(!viewModel.canSave)
             .keyboardShortcut(.return, modifiers: .command)
+            .pointingHandCursor()
         }
     }
     

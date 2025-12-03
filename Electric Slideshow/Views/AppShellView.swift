@@ -11,7 +11,13 @@ import SwiftUI
 struct AppShellView: View {
     @StateObject private var permissionVM: PermissionViewModel
     @State private var showingPermissionInstructions = false
-    
+
+    @EnvironmentObject private var spotifyAuthService: SpotifyAuthService
+    @StateObject private var spotifyAPIService = SpotifyAPIService(authService: SpotifyAuthService.shared)
+    @State private var showingSpotifyReauthAlert = false
+    @State private var spotifyReauthMessage: String?
+    @State private var prewarmedPlaybackBackend: MusicPlaybackBackend?
+
     init(photoService: PhotoLibraryService) {
         _permissionVM = StateObject(wrappedValue: PermissionViewModel(photoService: photoService))
     }
@@ -45,9 +51,69 @@ struct AppShellView: View {
         }
         .onAppear {
             permissionVM.checkAuthorizationStatus()
+
+            Task {
+                await validateSpotifyConnectionOnLaunch()
+            }
+
+            // If already authenticated at launch, pre-warm the internal player
+            prewarmInternalPlayerIfNeeded()
+        }
+        .onChange(of: spotifyAuthService.isAuthenticated) { isAuthed in
+            if isAuthed {
+                prewarmInternalPlayerIfNeeded()
+            }
+        }
+        .alert("Spotify Connection Issue", isPresented: $showingSpotifyReauthAlert) {
+            Button("Not Now", role: .cancel) {
+                // User can keep using slideshows without Spotify.
+            }
+            .pointingHandCursor()
+            Button("Reconnect") {
+                spotifyAuthService.beginAuthentication()
+            }
+            .pointingHandCursor()
+        } message: {
+            Text(spotifyReauthMessage ?? "Your Spotify account is not connected. Would you like to connect now?")
+        }
+    }
+
+    // MARK: - Spotify Connection Validation
+
+    /// Initializes the internal web player early so it is ready when a slideshow starts.
+    private func prewarmInternalPlayerIfNeeded() {
+        guard spotifyAuthService.isAuthenticated else { return }
+        guard prewarmedPlaybackBackend == nil else { return }
+        prewarmedPlaybackBackend = PlaybackBackendFactory.prewarmInternalBackend(spotifyAPIService: spotifyAPIService)
+    }
+
+    private func validateSpotifyConnectionOnLaunch() async {
+        // Only bother checking if we already *think* we’re authenticated.
+        guard spotifyAuthService.isAuthenticated else {
+            return
+        }
+
+        do {
+            // Uses the same API call the user sheet uses to load profile.
+            let profile = try await spotifyAPIService.fetchUserProfile()
+            print("[AppShell] Verified Spotify profile for \(profile.displayName ?? profile.id)")
+        } catch {
+            print("[AppShell] Spotify profile check failed on launch: \(error.localizedDescription)")
+
+            await MainActor.run {
+                // Make absolutely sure we don't keep a stale "connected" state.
+                spotifyAuthService.signOut()
+
+                spotifyReauthMessage =
+                    "Your Spotify connection appears to be invalid or has expired. " +
+                    "Would you like to reconnect now?"
+
+                showingSpotifyReauthAlert = true
+            }
         }
     }
 }
+
 
 // MARK: - Permission States
 
@@ -99,6 +165,7 @@ private struct RequestPermissionView: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .keyboardShortcut(.return, modifiers: [])
+            .pointingHandCursor()
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -128,12 +195,14 @@ private struct PermissionNotificationBar: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
+                .pointingHandCursor()
             } else {
                 Button("View Instructions") {
                     onShowInstructions()
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+                .pointingHandCursor()
             }
         }
         .padding(.horizontal, 16)
@@ -169,6 +238,7 @@ private struct PermissionInstructionsSheet: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .pointingHandCursor()
             }
             .padding(.top, 20)
             
@@ -250,6 +320,7 @@ private struct PermissionInstructionsSheet: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.large)
+                .pointingHandCursor()
             }
             
             Spacer()
@@ -339,6 +410,7 @@ private struct PermissionDeniedView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
+            .pointingHandCursor()
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

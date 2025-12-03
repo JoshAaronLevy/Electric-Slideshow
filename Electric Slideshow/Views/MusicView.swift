@@ -24,6 +24,9 @@ struct PlaylistsView: View {
                     notConnectedView
                 }
             }
+            .navigationDestination(for: UUID.self) { playlistId in
+                PlaylistDetailView(playlistId: playlistId)
+            }
             .sheet(isPresented: $showingNewPlaylistFlow) {
                 NewPlaylistFlowView(
                     spotifyAPIService: apiService,
@@ -38,7 +41,10 @@ struct PlaylistsView: View {
     private var playlistsView: some View {
         List {
             ForEach(playlistsStore.playlists) { playlist in
-                PlaylistRow(playlist: playlist)
+                NavigationLink(value: playlist.id) {
+                    PlaylistRow(playlist: playlist)
+                }
+                .pointingHandCursor()
             }
             .onDelete { offsets in
                 playlistsStore.deletePlaylist(at: offsets)
@@ -66,6 +72,7 @@ struct PlaylistsView: View {
                 .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
         }
         .buttonStyle(.plain)
+        .pointingHandCursor()
         .padding(24)
     }
     
@@ -91,6 +98,7 @@ struct PlaylistsView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(Color.appBlue)
+                .pointingHandCursor()
                 
                 if let error = spotifyAuthService.authError {
                     HStack {
@@ -128,6 +136,7 @@ struct PlaylistsView: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(Color.appBlue)
+            .pointingHandCursor()
         }
     }
 }

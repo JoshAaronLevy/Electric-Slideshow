@@ -12,6 +12,7 @@ struct Electric_SlideshowApp: App {
     @StateObject private var photoService = PhotoLibraryService()
     @StateObject private var spotifyAuthService = SpotifyAuthService.shared
     @StateObject private var playlistsStore = PlaylistsStore()
+    @StateObject private var nowPlayingStore = NowPlayingStore()
     
     var body: some Scene {
         Window("Electric Slideshow", id: "mainWindow") {
@@ -19,11 +20,12 @@ struct Electric_SlideshowApp: App {
                 .environmentObject(photoService)
                 .environmentObject(spotifyAuthService)
                 .environmentObject(playlistsStore)
+                .environmentObject(nowPlayingStore)
                 .onOpenURL { url in
                     print("[App] ===== onOpenURL CALLED =====")
                     print("[App] URL: \(url.absoluteString)")
                     print("[App] Scheme: \(url.scheme ?? "nil")")
-                    
+
                     // Handle OAuth callback
                     if url.scheme == "com.electricslideshow" {
                         print("[App] Scheme matches, calling handleCallback")

@@ -2,8 +2,8 @@ import SwiftUI
 
 struct SpotifyDevicesSheetView: View {
     @Environment(\.dismiss) private var dismiss
-    @StateObject var viewModel: SpotifyDevicesViewModel
-    
+    @ObservedObject var viewModel: SpotifyDevicesViewModel   // ← changed
+
     var body: some View {
         NavigationStack {
             Group {
@@ -14,19 +14,20 @@ struct SpotifyDevicesSheetView: View {
                     VStack(spacing: 16) {
                         Image(systemName: "exclamationmark.triangle")
                             .font(.largeTitle)
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(.yellow)
+
+                        Text("Unable to load devices")
+                            .font(.headline)
+
                         Text(error)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding()
-                } else if viewModel.devices.isEmpty {
-                    VStack(spacing: 16) {
-                        Image(systemName: "desktopcomputer")
-                            .font(.largeTitle)
-                            .foregroundStyle(.secondary)
-                        Text("No active Spotify devices found. To use Spotify playback, open Spotify on this Mac (or another device), start playing something in Spotify once, then come back and refresh.")
+                            .font(.subheadline)
                             .multilineTextAlignment(.center)
                             .foregroundStyle(.secondary)
+
+                        Button("Try Again") {
+                            Task { await viewModel.loadDevices() }
+                        }
+                        .pointingHandCursor()
                     }
                     .padding()
                 } else {
@@ -34,6 +35,7 @@ struct SpotifyDevicesSheetView: View {
                         HStack(spacing: 12) {
                             Image(systemName: device.is_active ? "checkmark.circle.fill" : "circle")
                                 .foregroundStyle(device.is_active ? .green : .secondary)
+
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(device.name)
                                     .font(.headline)
@@ -41,7 +43,9 @@ struct SpotifyDevicesSheetView: View {
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
+
                             Spacer()
+
                             if device.is_active {
                                 Text("Active")
                                     .font(.caption2)
@@ -56,14 +60,16 @@ struct SpotifyDevicesSheetView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Refresh") {
-                        Task { await viewModel.loadDevices() }
-                    }
+                    .pointingHandCursor()
                 }
             }
         }
-        .task { await viewModel.loadDevices() }
+        .task {
+            print("[SpotifyDevicesSheetView] View appeared, starting loadDevices task")
+            await viewModel.loadDevices()
+        }
+        .onAppear {
+            print("[SpotifyDevicesSheetView] onAppear called")
+        }
     }
 }

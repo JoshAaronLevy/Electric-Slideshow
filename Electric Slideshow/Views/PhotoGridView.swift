@@ -133,11 +133,7 @@ private struct PhotoThumbnailView: View {
         .animation(.easeInOut(duration: 0.2), value: thumbnail != nil)
         .onHover { hovering in
             isHovered = hovering
-            if hovering {
-                NSCursor.pointingHand.push()
-            } else {
-                NSCursor.pop()
-            }
         }
+        .pointingHandCursor()
     }
 }

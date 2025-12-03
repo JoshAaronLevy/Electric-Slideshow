@@ -22,9 +22,13 @@ final class NewPlaylistViewModel: ObservableObject {
     func buildPlaylist() -> AppPlaylist? {
         guard canSave else { return nil }
         
+        let tracks = selectedTrackURIs.map { uri in
+            PlaylistTrack(uri: uri)
+        }
+        
         return AppPlaylist(
             name: name.trimmingCharacters(in: .whitespacesAndNewlines),
-            trackURIs: Array(selectedTrackURIs)
+            playlistTracks: tracks.sorted { $0.uri < $1.uri }
         )
     }
     

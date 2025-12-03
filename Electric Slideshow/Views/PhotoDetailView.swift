@@ -47,6 +47,7 @@ struct PhotoDetailView: View {
                     dismiss()
                 }
                 .keyboardShortcut(.cancelAction)
+                .pointingHandCursor()
             }
             .padding()
             .background(.ultraThinMaterial)

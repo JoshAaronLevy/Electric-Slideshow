@@ -34,6 +34,7 @@ struct AlbumListView: View {
                         }
                     }
                     .buttonStyle(.borderedProminent)
+                    .pointingHandCursor()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if viewModel.albums.isEmpty {
@@ -46,6 +47,7 @@ struct AlbumListView: View {
                             await viewModel.loadAlbums()
                         }
                     }
+                    .pointingHandCursor()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -64,6 +66,7 @@ struct AlbumListView: View {
                         }
                     }
                     .tag(album)
+                    .pointingHandCursor()
                 }
                 .listStyle(.sidebar)
             }
@@ -78,6 +81,7 @@ struct AlbumListView: View {
                 }) {
                     Image(systemName: "arrow.clockwise")
                 }
+                .pointingHandCursor()
             }
         }
         .task {

@@ -1,7 +1,7 @@
 import Foundation
-import AppKit
 import Combine
 import Photos
+import AppKit
 
 /// ViewModel for managing slideshow playback with music integration
 @MainActor
@@ -13,14 +13,25 @@ final class SlideshowPlaybackViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var showingMusicError: Bool = false
     @Published var currentPlaybackState: SpotifyPlaybackState?
+    /// When true, the music error alert should offer a “Download Spotify” button
+    /// rather than just “Continue without music”.
+    @Published var requiresSpotifyAppInstall: Bool = false
+    @Published var normalizedPlaybackState: PlaybackState = .idle
+    @Published var isShuffleEnabled: Bool = false
+    @Published var repeatMode: PlaybackRepeatMode = .off
     
     private var slideTimer: Timer?
     private var playbackCheckTimer: Timer?
+    private var musicClipTimer: Timer?
     private let slideshow: Slideshow
     private let photoService: PhotoLibraryService
     private let spotifyAPIService: SpotifyAPIService?
     private let playlistsStore: PlaylistsStore?
     private var playbackIndices: [Int] = []
+    private var musicClipMode: MusicClipMode = .seconds60
+    private var lastClipAppliedTrackUri: String?
+    private let minClipWindowMs = 500
+    private let musicBackend: MusicPlaybackBackend?
     
     var currentImage: NSImage? {
         guard currentIndex < loadedImages.count else { return nil }
@@ -49,17 +60,22 @@ final class SlideshowPlaybackViewModel: ObservableObject {
         slideshow: Slideshow,
         photoService: PhotoLibraryService,
         spotifyAPIService: SpotifyAPIService? = nil,
-        playlistsStore: PlaylistsStore? = nil
+        playlistsStore: PlaylistsStore? = nil,
+        musicBackend: MusicPlaybackBackend? = nil
     ) {
         self.slideshow = slideshow
         self.photoService = photoService
         self.spotifyAPIService = spotifyAPIService
         self.playlistsStore = playlistsStore
+        self.musicBackend = musicBackend
+
+        setupMusicBackendCallbacks()
     }
     
     // MARK: - Lifecycle
     
     func startPlayback() async {
+        musicBackend?.initialize()
         await loadAllImages()
         setupPlaybackOrder()
         await startMusic()
@@ -70,9 +86,92 @@ final class SlideshowPlaybackViewModel: ObservableObject {
     func stopPlayback() async {
         stopSlideTimer()
         stopPlaybackStateMonitoring()
+        stopMusicClipTimer()
         await stopMusic()
     }
-    
+
+    // MARK: - Music clip mode
+
+    /// Updates the current clip mode used for music playback.
+    /// Stage 2: stores the value and updates any active clip timer.
+    func updateClipMode(_ mode: MusicClipMode) {
+        musicClipMode = mode
+
+        // If we're in full-song mode, cancel any existing timer.
+        guard musicClipMode.clipDuration != nil else {
+            stopMusicClipTimer()
+            return
+        }
+
+        // Only (re)start the timer if music is currently playing.
+        if currentPlaybackState?.isPlaying == true {
+            resetMusicClipTimerForCurrentTrack()
+        } else {
+            // No active playback → no timer.
+            stopMusicClipTimer()
+        }
+    }
+
+    /// Connects the music backend's callbacks to this view model so that
+    /// backend-agnostic PlaybackState can drive the UI.
+    private func setupMusicBackendCallbacks() {
+        guard let backend = musicBackend else { return }
+
+        backend.onStateChanged = { [weak self] state in
+            // Ensure UI updates happen on main actor
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                self.normalizedPlaybackState = state
+            }
+        }
+
+        backend.onError = { [weak self] error in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+
+                // You can keep this as simple logging, or surface it via your
+                // existing error UI. Here's a minimal version:
+                print("[SlideshowPlaybackViewModel] Playback backend error: \(error)")
+
+                // Optional: hook into your music error UI if you want
+                // self.errorMessage = "Music playback error"
+                // self.showingMusicError = true
+            }
+        }
+    }
+
+    /// Starts the clip timer for the given duration (in seconds).
+    private func startMusicClipTimer(duration: TimeInterval) {
+        stopMusicClipTimer()
+
+        musicClipTimer = Timer.scheduledTimer(
+            withTimeInterval: duration,
+            repeats: false
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                // After the clip window ends, move to the next track
+                await self.skipToNextTrack()
+                // And arm the timer again for the next track
+                self.resetMusicClipTimerForCurrentTrack()
+            }
+        }
+    }
+
+    /// Cancels any existing music clip timer.
+    private func stopMusicClipTimer() {
+        musicClipTimer?.invalidate()
+        musicClipTimer = nil
+    }
+
+    /// Applies the current clip settings (custom, playlist default, or global) to the active track.
+    /// Seeks to the correct start and arms a timer to advance when the clip window ends.
+    private func resetMusicClipTimerForCurrentTrack() {
+        Task { @MainActor [weak self] in
+            await self?.applyClipForCurrentTrack()
+        }
+    }
+
     // MARK: - Image Loading
     
     private func loadAllImages() async {
@@ -143,9 +242,15 @@ final class SlideshowPlaybackViewModel: ObservableObject {
         isPlaying.toggle()
         
         if isPlaying {
+            // Resume slideshow timer
             startSlideTimer()
+            // Resume Spotify from where it left off
+            resumeMusicIfNeeded()
         } else {
+            // Pause slideshow timer
             stopSlideTimer()
+            // Pause Spotify playback
+            pauseMusicIfNeeded()
         }
     }
     
@@ -180,66 +285,229 @@ final class SlideshowPlaybackViewModel: ObservableObject {
     // MARK: - Music Playback
     
     private func startMusic() async {
+        guard let apiService = spotifyAPIService else { return }
         guard let playlistId = slideshow.settings.linkedPlaylistId,
-              let playlistsStore = playlistsStore,
-              let apiService = spotifyAPIService else {
-            // No music configured or Spotify not available
+            let playlist = playlistsStore?.playlists.first(where: { $0.id == playlistId })
+        else {
             return
         }
 
-        // Find the app playlist
-        guard let playlist = playlistsStore.playlists.first(where: { $0.id == playlistId }) else {
-            errorMessage = "Playlist not found"
-            return
-        }
-
-        guard !playlist.trackURIs.isEmpty else {
-            errorMessage = "Playlist is empty"
-            return
+        // 1. Ensure the playback environment is ready
+        if let backend = musicBackend, !backend.requiresExternalApp {
+            // Internal player: wait for it to be ready
+            print("[SlideshowPlaybackViewModel] Waiting for internal player to be ready...")
+            
+            // Simple polling loop to wait for backend.isReady
+            let timeout = Date().addingTimeInterval(10) // 10s timeout
+            while !backend.isReady && Date() < timeout {
+                try? await Task.sleep(nanoseconds: 200_000_000) // 200ms
+            }
+            
+            if !backend.isReady {
+                print("[SlideshowPlaybackViewModel] Internal player failed to become ready in time.")
+                showingMusicError = true
+                errorMessage = "Internal music player failed to initialize."
+                return
+            }
+        } else {
+            // External player: Ensure the Spotify macOS app exists and is launched
+            let desktopReady = await ensureSpotifyDesktopAvailable()
+            if !desktopReady {
+                return
+            }
         }
 
         do {
-            // Fetch available devices
             let devices = try await apiService.fetchAvailableDevices()
-            // Prefer active device, fallback to device of type "Computer" (Mac)
-            let activeDevice = devices.first(where: { $0.is_active })
-                ?? devices.first(where: { $0.type.lowercased() == "computer" })
 
-            guard let device = activeDevice else {
+            guard !devices.isEmpty else {
                 showingMusicError = true
-                errorMessage = "We couldn’t find an active Spotify device. Open Spotify on this Mac (or another device), start playing something once, then try again."
+                errorMessage =
+                    "We couldn’t find any Spotify playback devices on your account.\n\n" +
+                    "Open Spotify on this Mac or another device and try again."
                 return
             }
 
-            do {
-                try await apiService.startPlayback(trackURIs: playlist.trackURIs, deviceId: device.deviceId)
-            } catch let playbackError as SpotifyAPIService.PlaybackError {
-                switch playbackError {
-                case .noActiveDevice(let message):
-                    showingMusicError = true
-                    errorMessage = message.isEmpty ? "We couldn’t find an active Spotify device. Open Spotify on this Mac (or another device), start playing something once, then try again." : message
-                case .generic(let message):
-                    showingMusicError = true
-                    errorMessage = message.isEmpty ? "Couldn’t start Spotify playback." : message
-                }
-            } catch {
+            // Prefer the internal player if available, then active, then computer
+            let targetDevice =
+                devices.first(where: { $0.name == "Electric Slideshow Internal Player" }) ??
+                devices.first(where: { $0.is_active }) ??
+                devices.first(where: { $0.type.lowercased() == "computer" }) ??
+                devices.first!
+
+            print("[SlideshowPlaybackViewModel] Using Spotify device: \(targetDevice.name) (\(targetDevice.type))")
+
+            try await apiService.startPlayback(
+                trackURIs: playlist.trackURIs,
+                deviceId: targetDevice.deviceId
+            )
+            resetMusicClipTimerForCurrentTrack()
+        } catch let playbackError as SpotifyAPIService.PlaybackError {
+            switch playbackError {
+            case .noActiveDevice(let message):
                 showingMusicError = true
-                errorMessage = "Couldn’t start Spotify playback."
+                errorMessage = (
+                    message.isEmpty
+                    ? "Spotify couldn’t find an active playback device.\n\n" +
+                    "Make sure Spotify is open on this Mac or another device " +
+                    "and start playing any track once, then try again."
+                    : message
+                )
+
+            case .generic(let message):
+                showingMusicError = true
+                errorMessage = message.isEmpty ?
+                    "Couldn’t start Spotify playback." :
+                    message
             }
         } catch {
             showingMusicError = true
             errorMessage = "Couldn’t start Spotify playback."
         }
     }
+
+    // MARK: - Spotify Desktop Integration
+
+    /// Ensures that the Spotify macOS app is installed, and launches it if needed.
+    /// - Returns: `true` if the app is installed (launched or already running), `false` if not installed.
+    @MainActor
+    private func ensureSpotifyDesktopAvailable() async -> Bool {
+        let bundleId = "com.spotify.client"
+        let workspace = NSWorkspace.shared
+
+        // Reset any previous “missing app” state
+        requiresSpotifyAppInstall = false
+
+        // 1. Check if the Spotify app is installed at all
+        guard let appURL = workspace.urlForApplication(withBundleIdentifier: bundleId) else {
+            // Not installed → show a specific error and mark that we need to offer “Download”
+            errorMessage =
+                """
+                Spotify for macOS does not appear to be installed.
+
+                To enable music playback in Electric Slideshow, you’ll need:
+                • The Spotify app installed on this Mac
+                • An active Spotify Premium subscription
+                """
+            requiresSpotifyAppInstall = true
+            showingMusicError = true
+            return false
+        }
+
+        // 2. If it is installed but not running, launch it
+        let isRunning = workspace.runningApplications.contains { $0.bundleIdentifier == bundleId }
+
+        if !isRunning {
+            do {
+                // Launch Spotify **without** activating it (don’t steal focus)
+                try workspace.launchApplication(
+                    at: appURL,
+                    options: [.withoutActivation],
+                    configuration: [:]
+                )
+
+                // Give Spotify a brief moment to launch and register as a device
+                try await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
+
+                // Make sure Electric Slideshow stays / comes back to the front
+                NSApplication.shared.activate(ignoringOtherApps: true)
+            } catch {
+                print("[SlideshowPlaybackViewModel] Failed to launch Spotify app: \(error)")
+                errorMessage = "Couldn’t open the Spotify app on this Mac."
+                showingMusicError = true
+                return false
+            }
+        }
+
+        return true
+    }
     
     private func stopMusic() async {
         guard spotifyAPIService != nil else { return }
         
+        stopMusicClipTimer()
+
         do {
             try await spotifyAPIService?.pausePlayback()
         } catch {
             // Ignore stop errors
         }
+    }
+
+    private func pauseMusicIfNeeded() {
+        guard slideshow.settings.linkedPlaylistId != nil else {
+            return
+        }
+
+        // Stop any active clip timer when pausing music
+        stopMusicClipTimer()
+
+        if let backend = musicBackend {
+            backend.pause()
+            return
+        }
+
+        // Fallback: direct API call if no backend is present
+        guard let apiService = spotifyAPIService else { return }
+
+        Task {
+            do {
+                try await apiService.pausePlayback()
+            } catch {
+                // Don’t break the slideshow if Spotify pause fails
+                print("[SlideshowPlaybackViewModel] Failed to pause Spotify playback: \(error)")
+            }
+        }
+    }
+
+    private func resumeMusicIfNeeded() {
+        guard slideshow.settings.linkedPlaylistId != nil else {
+            return
+        }
+
+        if let backend = musicBackend {
+            // Backend handles the async call; we just re-arm the clip timer
+            backend.resume()
+            // Re-arm the clip timer if a clip mode is active
+            resetMusicClipTimerForCurrentTrack()
+            return
+        }
+
+        // Fallback: direct API call if no backend is present
+        guard let apiService = spotifyAPIService else { return }
+
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+
+            do {
+                // Resume playback from wherever Spotify left off
+                try await apiService.resumePlayback()
+                // Re-arm the clip timer if a clip mode is active
+                self.resetMusicClipTimerForCurrentTrack()
+            } catch {
+                print("[SlideshowPlaybackViewModel] Failed to resume Spotify playback: \(error)")
+            }
+        }
+    }
+
+    func setShuffleEnabled(_ isOn: Bool) {
+        isShuffleEnabled = isOn
+        musicBackend?.setShuffleEnabled(isOn)
+    }
+
+    func setRepeatAllEnabled(_ isOn: Bool) {
+        repeatMode = isOn ? .all : .off
+        musicBackend?.setRepeatMode(repeatMode)
+    }
+
+    /// Optional: convenience toggles for UI
+    func toggleShuffle() {
+        setShuffleEnabled(!isShuffleEnabled)
+    }
+
+    func toggleRepeatAll() {
+        let newIsOn = (repeatMode != .all)
+        setRepeatAllEnabled(newIsOn)
     }
     
     // MARK: - Playback State Monitoring
@@ -261,9 +529,131 @@ final class SlideshowPlaybackViewModel: ObservableObject {
         guard let apiService = spotifyAPIService else { return }
         
         do {
-            currentPlaybackState = try await apiService.getCurrentPlaybackState()
+            let state = try await apiService.getCurrentPlaybackState()
+            currentPlaybackState = state
+            updateNormalizedPlaybackState(from: state)
+            if let uri = state?.item?.uri, uri != lastClipAppliedTrackUri {
+                resetMusicClipTimerForCurrentTrack()
+            }
         } catch {
             // Silently fail
+        }
+    }
+
+    /// Maps the Spotify-specific playback state into our normalized PlaybackState
+    /// so the rest of the app doesn't need to know about Spotify's model.
+    private func updateNormalizedPlaybackState(from playback: SpotifyPlaybackState?) {
+        guard let playback, let track = playback.item else {
+            normalizedPlaybackState = .idle
+            return
+        }
+
+        normalizedPlaybackState = PlaybackState(
+            trackUri: track.uri,
+            trackName: track.name,
+            artistName: track.artists.first?.name,
+            positionMs: playback.progressMs ?? 0,
+            durationMs: track.durationMs,
+            isPlaying: playback.isPlaying,
+            isBuffering: false
+        )
+    }
+
+    // MARK: - Clip application (custom / playlist default / global)
+
+    /// Applies the effective clip window for the current Spotify track (custom > playlist default > global).
+    private func applyClipForCurrentTrack() async {
+        stopMusicClipTimer()
+
+        guard
+            let apiService = spotifyAPIService,
+            let playlistId = slideshow.settings.linkedPlaylistId,
+            let playlist = playlistsStore?.playlists.first(where: { $0.id == playlistId })
+        else {
+            return
+        }
+
+        do {
+            guard let playback = try await apiService.getCurrentPlaybackState(),
+                  let item = playback.item else {
+                return
+            }
+
+            let uri = item.uri
+            let trackDuration = item.durationMs
+            let playlistTrack = playlist.playlistTracks.first { $0.uri == uri }
+            let clipWindow = effectiveClipWindow(
+                track: playlistTrack,
+                playlist: playlist,
+                trackDurationMs: trackDuration
+            )
+
+            // Seek to the clip start if needed
+            if let startMs = clipWindow.startMs, startMs > 0 {
+                if let backend = musicBackend, backend.isReady {
+                    backend.seek(to: startMs)
+                } else {
+                    try await apiService.seekToPosition(positionMs: startMs)
+                }
+            }
+
+            // Arm timer for clip duration
+            if let durationMs = clipWindow.durationMs {
+                startMusicClipTimer(duration: Double(durationMs) / 1000.0)
+            }
+
+            lastClipAppliedTrackUri = uri
+        } catch {
+            // If we fail to fetch state or seek, just leave playback running.
+            print("[SlideshowPlaybackViewModel] Failed to apply clip: \(error)")
+        }
+    }
+
+    private func effectiveClipWindow(
+        track: PlaylistTrack?,
+        playlist: AppPlaylist,
+        trackDurationMs: Int?
+    ) -> (startMs: Int?, durationMs: Int?) {
+        let durationMsPreferred = trackDurationMs ?? track?.durationMs
+
+        // Custom clip
+        if let track, track.clipMode == .custom {
+            let start = max(0, track.customStartMs ?? 0)
+            let endRaw = track.customEndMs ?? (durationMsPreferred ?? start)
+            let clampedEnd = clamp(endRaw, to: durationMsPreferred, lowerBound: start + minClipWindowMs)
+            let duration = max(clampedEnd - start, minClipWindowMs)
+            return (start, duration)
+        }
+
+        // Playlist default or global
+        let mode = playlist.playlistDefaultClipMode ?? musicClipMode
+        guard let clipSeconds = mode.clipDuration else {
+            // Full song: no timer, play to natural end
+            return (0, trackDurationMs)
+        }
+
+        let clipMs = Int(clipSeconds * 1000)
+        let durationMs: Int
+        let startMs: Int
+
+        if let duration = durationMsPreferred, duration > clipMs {
+            // Random start within track if it can fit the clip window
+            let maxStart = max(duration - clipMs, 0)
+            startMs = maxStart > 0 ? Int.random(in: 0...maxStart) : 0
+            durationMs = clipMs
+        } else {
+            startMs = 0
+            durationMs = durationMsPreferred.map { min($0, clipMs) } ?? clipMs
+        }
+
+        return (startMs, durationMs)
+    }
+
+    private func clamp(_ value: Int, to upperBound: Int?, lowerBound: Int) -> Int {
+        if let upper = upperBound {
+            return min(max(value, lowerBound), upper)
+        } else {
+            return max(value, lowerBound)
         }
     }
     
@@ -287,26 +677,66 @@ final class SlideshowPlaybackViewModel: ObservableObject {
             errorMessage = "Music control failed"
         }
     }
+
+    /// Toggles **only** the Spotify playback (no effect on slideshow timer or slide index).
+    func toggleMusicPlayPause() {
+        // If we don't know the state yet, try to resume – it's more useful than a no-op.
+        if let playback = currentPlaybackState {
+            if playback.isPlaying {
+                pauseMusicIfNeeded()
+            } else {
+                resumeMusicIfNeeded()
+            }
+        } else {
+            // No state yet – optimistically try to resume
+            resumeMusicIfNeeded()
+        }
+    }
     
     func skipToNextTrack() async {
+        if let backend = musicBackend {
+            backend.nextTrack()
+            // New track → restart the clip timer (if active)
+            resetMusicClipTimerForCurrentTrack()
+            return
+        }
+
         guard let apiService = spotifyAPIService else { return }
-        
+
         do {
             try await apiService.skipToNext()
             await checkPlaybackState()
+            // New track → restart the clip timer (if active)
+            resetMusicClipTimerForCurrentTrack()
         } catch {
             errorMessage = "Failed to skip track"
         }
     }
     
     func skipToPreviousTrack() async {
+        if let backend = musicBackend {
+            backend.previousTrack()
+            // New track → restart the clip timer (if active)
+            resetMusicClipTimerForCurrentTrack()
+            return
+        }
+
         guard let apiService = spotifyAPIService else { return }
-        
+
         do {
             try await apiService.skipToPrevious()
             await checkPlaybackState()
+            // New track → restart the clip timer (if active)
+            resetMusicClipTimerForCurrentTrack()
         } catch {
             errorMessage = "Failed to skip track"
         }
+    }
+
+    /// Opens the Spotify download page in the user’s default browser.
+    @MainActor
+    func openSpotifyDownloadPage() {
+        guard let url = URL(string: "https://www.spotify.com/download/mac") else { return }
+        NSWorkspace.shared.open(url)
     }
 }

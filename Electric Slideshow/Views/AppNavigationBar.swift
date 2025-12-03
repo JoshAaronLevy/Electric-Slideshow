@@ -16,6 +16,8 @@ struct AppNavigationBar: View {
     let selectedSection: AppSection
     let onSectionSelected: (AppSection) -> Void
     let onUserIconTapped: () -> Void
+
+    @EnvironmentObject private var spotifyAuthService: SpotifyAuthService
     
     var body: some View {
         HStack(spacing: 0) {
@@ -86,7 +88,8 @@ struct AppNavigationBar: View {
     
     private func navigationButton(for section: AppSection) -> some View {
         let isSelected = selectedSection == section
-        
+        let showSpotifyWarning = (section == .music && !spotifyAuthService.isAuthenticated)
+
         return Button {
             if section == .user {
                 onUserIconTapped()
@@ -94,19 +97,34 @@ struct AppNavigationBar: View {
                 onSectionSelected(section)
             }
         } label: {
-            Image(systemName: section.systemImageName)
-                .font(.system(size: 17))
-                .fontWeight(isSelected ? .semibold : .regular)
-                .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
-                .frame(width: 34, height: 34)
-                .background(
-                    RoundedRectangle(cornerRadius: 7)
-                        .fill(isSelected ? Color.accentColor.opacity(0.15) : Color.clear)
-                )
-                .contentShape(Rectangle())
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: section.systemImageName)
+                    .font(.system(size: 17))
+                    .fontWeight(isSelected ? .semibold : .regular)
+                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                    .frame(width: 34, height: 34)
+                    .background(
+                        RoundedRectangle(cornerRadius: 7)
+                            .fill(isSelected ? Color.accentColor.opacity(0.15) : Color.clear)
+                    )
+                    .contentShape(Rectangle())
+
+                if showSpotifyWarning {
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 12, height: 12)
+                        .overlay(
+                            Image(systemName: "exclamationmark")
+                                .font(.system(size: 7, weight: .bold))
+                                .foregroundColor(.white)
+                        )
+                        .offset(x: 6, y: -6)
+                }
+            }
         }
         .buttonStyle(.plain)
         .help(section.title)
+        .pointingHandCursor()
         .animation(.easeInOut(duration: 0.15), value: isSelected)
     }
 }
@@ -117,7 +135,7 @@ struct AppNavigationBar: View {
             appTitleTop: "Electric",
             appTitleBottom: "Slideshow",
             currentSectionTitle: "Slideshows",
-            sections: [.slideshows, .music, .settings, .user],
+            sections: [.nowPlaying, .slideshows, .music, .settings, .user],
             selectedSection: .slideshows,
             onSectionSelected: { _ in },
             onUserIconTapped: { }
@@ -133,7 +151,7 @@ struct AppNavigationBar: View {
             appTitleTop: "Electric",
             appTitleBottom: "Slideshow",
             currentSectionTitle: "Playlists",
-            sections: [.slideshows, .music, .settings, .user],
+            sections: [.nowPlaying, .slideshows, .music, .settings, .user],
             selectedSection: .music,
             onSectionSelected: { _ in },
             onUserIconTapped: { }
@@ -149,7 +167,7 @@ struct AppNavigationBar: View {
             appTitleTop: "Electric",
             appTitleBottom: "Slideshow",
             currentSectionTitle: "Settings",
-            sections: [.slideshows, .music, .settings, .user],
+            sections: [.nowPlaying, .slideshows, .music, .settings, .user],
             selectedSection: .settings,
             onSectionSelected: { _ in },
             onUserIconTapped: { }
@@ -166,7 +184,7 @@ struct AppNavigationBar: View {
             appTitleTop: "Electric",
             appTitleBottom: "Slideshow",
             currentSectionTitle: "Slideshows",
-            sections: [.slideshows, .music, .settings, .user],
+            sections: [.nowPlaying, .slideshows, .music, .settings, .user],
             selectedSection: .slideshows,
             onSectionSelected: { _ in },
             onUserIconTapped: { }
@@ -182,7 +200,7 @@ struct AppNavigationBar: View {
             appTitleTop: "Electric",
             appTitleBottom: "Slideshow",
             currentSectionTitle: "Playlists",
-            sections: [.slideshows, .music, .settings, .user],
+            sections: [.nowPlaying, .slideshows, .music, .settings, .user],
             selectedSection: .music,
             onSectionSelected: { _ in },
             onUserIconTapped: { }

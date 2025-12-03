@@ -13,24 +13,64 @@ struct PhotoSelectionView: View {
     @EnvironmentObject private var photoService: PhotoLibraryService
     
     private let columns = [
-        GridItem(.adaptive(minimum: 120, maximum: 180), spacing: 8)
+        GridItem(.fixed(120), spacing: 8),
+        GridItem(.fixed(120), spacing: 8),
+        GridItem(.fixed(120), spacing: 8),
+        GridItem(.fixed(120), spacing: 8)
     ]
     
     var body: some View {
-        HSplitView {
-            // Left sidebar: Album list
-            albumSidebar
-                .frame(minWidth: 200, idealWidth: 250, maxWidth: 300)
+        VStack(spacing: 0) {
+            // Toolbar at the top
+            toolbar
             
-            // Right content: Photo grid
-            photoGrid
-                .frame(minWidth: 400)
+            // Main content
+            HSplitView {
+                // Left sidebar: Album list
+                albumSidebar
+                    .frame(minWidth: 200, idealWidth: 250, maxWidth: 300)
+                
+                // Right content: Photo grid
+                photoGrid
+                    .frame(minWidth: 400)
+            }
         }
         .task {
             if viewModel.albums.isEmpty {
                 await viewModel.loadAlbums()
             }
         }
+    }
+    
+    // MARK: - Toolbar
+    
+    private var toolbar: some View {
+        HStack {
+            Text("Select Photos")
+                .font(.headline)
+            
+            Spacer()
+            
+            HStack(spacing: 8) {
+                Button("Select All") {
+                    viewModel.selectAll()
+                }
+                .buttonStyle(.bordered)
+                .disabled(viewModel.selectedCount == viewModel.assets.count || viewModel.assets.isEmpty)
+                .keyboardShortcut("a", modifiers: .command)
+                .pointingHandCursor()
+                
+                Button("Deselect All") {
+                    viewModel.clearSelection()
+                }
+                .buttonStyle(.bordered)
+                .disabled(viewModel.selectedCount == 0)
+                .pointingHandCursor()
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Color(nsColor: .controlBackgroundColor))
     }
     
     // MARK: - Album Sidebar
@@ -149,12 +189,14 @@ struct PhotoSelectionView: View {
                     .buttonStyle(.bordered)
                     .disabled(viewModel.selectedCount == viewModel.assets.count)
                     .keyboardShortcut("a", modifiers: .command)
+                    .pointingHandCursor()
                     
                     Button("Clear") {
                         viewModel.clearSelection()
                     }
                     .buttonStyle(.bordered)
                     .disabled(viewModel.selectedCount == 0)
+                    .pointingHandCursor()
                 }
             }
         }
@@ -214,6 +256,7 @@ private struct AlbumRow: View {
             }
         }
         .padding(.vertical, 2)
+        .pointingHandCursor()
     }
 }
 
@@ -277,12 +320,8 @@ private struct PhotoThumbnailView: View {
         }
         .onHover { hovering in
             isHovered = hovering
-            if hovering {
-                NSCursor.pointingHand.push()
-            } else {
-                NSCursor.pop()
-            }
         }
+        .pointingHandCursor()
         .animation(.easeInOut(duration: 0.2), value: isSelected)
         .task {
             await loadThumbnail()

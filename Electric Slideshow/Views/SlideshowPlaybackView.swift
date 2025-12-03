@@ -1,29 +1,37 @@
 import SwiftUI
+import AppKit
 
-/// Full-screen slideshow playback view with controls and music integration
 struct SlideshowPlaybackView: View {
     @StateObject private var viewModel: SlideshowPlaybackViewModel
-    @Environment(\.dismiss) private var dismiss
-    @State private var showControls = true
-    @State private var controlsTimer: Timer?
-    @State private var lastMouseMovement = Date()
-    
+    @EnvironmentObject private var playbackBridge: NowPlayingPlaybackBridge
+    @FocusState private var isFocused: Bool
+
+    private let onViewModelReady: ((SlideshowPlaybackViewModel) -> Void)?
+
     init(
         slideshow: Slideshow,
         photoService: PhotoLibraryService,
         spotifyAPIService: SpotifyAPIService?,
-        playlistsStore: PlaylistsStore?
+        playlistsStore: PlaylistsStore?,
+        onViewModelReady: ((SlideshowPlaybackViewModel) -> Void)? = nil
     ) {
-        self._viewModel = StateObject(
-            wrappedValue: SlideshowPlaybackViewModel(
-                slideshow: slideshow,
-                photoService: photoService,
-                spotifyAPIService: spotifyAPIService,
-                playlistsStore: playlistsStore
-            )
+        // Decide which backend to use for this session.
+        // Right now this uses the global default (external device).
+        let backend = PlaybackBackendFactory.makeBackend(
+            mode: PlaybackBackendFactory.defaultMode,
+            spotifyAPIService: spotifyAPIService
         )
+
+        _viewModel = StateObject(wrappedValue: SlideshowPlaybackViewModel(
+            slideshow: slideshow,
+            photoService: photoService,
+            spotifyAPIService: spotifyAPIService,
+            playlistsStore: playlistsStore,
+            musicBackend: backend
+        ))
+        self.onViewModelReady = onViewModelReady
     }
-    
+
     var body: some View {
         ZStack {
             // Full-screen black background
@@ -36,245 +44,205 @@ struct SlideshowPlaybackView: View {
                     .foregroundStyle(.white)
             } else if let image = viewModel.currentImage {
                 GeometryReader { geometry in
-                    Image(nsImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: geometry.size.width, height: geometry.size.height)
-                        .id(viewModel.currentIndex) // Force view update
-                        .transition(.opacity)
+                    ZStack {
+                        Image(nsImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: geometry.size.width, height: geometry.size.height)
+                            .id(viewModel.currentIndex) // Force view update
+                            .transition(.opacity)
+
+                        // Paused state overlay
+                        if !viewModel.isPlaying {
+                            Image(systemName: "play.circle.fill")
+                                .font(.system(size: 96))
+                                .foregroundStyle(.white.opacity(0.9))
+                                .shadow(radius: 10)
+                        }
+                    }
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        // Only interaction with the photo: toggle slideshow + music play/pause
+                        viewModel.togglePlayPause()
+                    }
+                    .pointingHandCursor()
                 }
                 .ignoresSafeArea(edges: .all)
-            }
-            
-            // Controls overlay
-            if showControls {
-                controlsOverlay
-                    .transition(.opacity)
             }
         }
         .animation(.easeInOut(duration: 1.0), value: viewModel.currentIndex)
         .task {
             await viewModel.startPlayback()
         }
+        .onAppear {
+            // Let the parent know about our view model so it can bridge controls
+            onViewModelReady?(viewModel)
+
+            // Wire commands into the playbackBridge
+            playbackBridge.goToPreviousSlide = {
+                if viewModel.hasPreviousSlide {
+                    viewModel.previousSlide()
+                }
+            }
+
+            playbackBridge.togglePlayPause = {
+                viewModel.togglePlayPause()
+            }
+
+            playbackBridge.goToNextSlide = {
+                if viewModel.hasNextSlide {
+                    viewModel.nextSlide()
+                }
+            }
+
+            // Music-only controls
+            playbackBridge.musicPreviousTrack = {
+                Task {
+                    await viewModel.skipToPreviousTrack()
+                }
+            }
+
+            playbackBridge.musicTogglePlayPause = {
+                viewModel.toggleMusicPlayPause()
+            }
+
+            playbackBridge.musicNextTrack = {
+                Task {
+                    await viewModel.skipToNextTrack()
+                }
+            }
+
+            // Initialize the view model with the current clip mode
+            viewModel.updateClipMode(playbackBridge.clipMode)
+
+            // React to future changes from the sidebar
+            playbackBridge.onClipModeChanged = { [weak viewModel] newMode in
+                viewModel?.updateClipMode(newMode)
+            }
+
+            playbackBridge.toggleShuffle = { [weak viewModel] in
+                viewModel?.toggleShuffle()
+            }
+
+            playbackBridge.toggleRepeatAll = { [weak viewModel] in
+                viewModel?.toggleRepeatAll()
+            }
+
+            syncPlaybackBridge()
+        }
+        // Whenever the slideshow or playback state changes, mirror it into the bridge
+        .onReceive(viewModel.$currentIndex) { _ in
+            syncPlaybackBridge()
+        }
+        .onReceive(viewModel.$loadedImages) { _ in
+            syncPlaybackBridge()
+        }
+        .onReceive(viewModel.$isPlaying) { _ in
+            syncPlaybackBridge()
+        }
+        .onReceive(viewModel.$currentPlaybackState) { _ in
+            syncPlaybackBridge()
+        }
         .onDisappear {
+            // Stop playback as before
             Task {
                 await viewModel.stopPlayback()
             }
+
+            // Clear out the bridge commands when this view goes away
+            playbackBridge.goToPreviousSlide = nil
+            playbackBridge.togglePlayPause = nil
+            playbackBridge.goToNextSlide = nil
+
+            playbackBridge.musicPreviousTrack = nil
+            playbackBridge.musicTogglePlayPause = nil
+            playbackBridge.musicNextTrack = nil
+
+            // Clear mirrored state so the sidebar doesn't show stale info
+            playbackBridge.currentSlideIndex = 0
+            playbackBridge.totalSlides = 0
+            playbackBridge.isSlideshowPlaying = false
+            playbackBridge.currentTrackTitle = ""
+            playbackBridge.currentTrackArtist = ""
+            playbackBridge.isMusicPlaying = false
+
+            playbackBridge.musicNextTrack = nil
+            playbackBridge.onClipModeChanged = nil
+
+            // Clear mirrored state so the sidebar doesn't show stale info
+            playbackBridge.currentSlideIndex = 0
         }
-        .onContinuousHover { phase in
-            switch phase {
-            case .active:
-                onMouseActivity()
-            case .ended:
-                break
-            }
-        }
+        .focusable()
+        .focusEffectDisabled()
+        .focused($isFocused)
         .onKeyPress(.space) {
             viewModel.togglePlayPause()
-            onMouseActivity()
             return .handled
         }
         .onKeyPress(.leftArrow) {
             if viewModel.hasPreviousSlide {
                 viewModel.previousSlide()
-                onMouseActivity()
             }
             return .handled
         }
         .onKeyPress(.rightArrow) {
             if viewModel.hasNextSlide {
                 viewModel.nextSlide()
-                onMouseActivity()
             }
             return .handled
         }
-        .onKeyPress(.escape) {
-            dismiss()
-            return .handled
-        }
-        .alert("Music Playback Failed", isPresented: $viewModel.showingMusicError) {
-            Button("Continue Without Music") {
-                viewModel.showingMusicError = false
-            }
-            Button("Cancel", role: .cancel) {
-                dismiss()
+        .alert("Music Playback", isPresented: $viewModel.showingMusicError) {
+            if viewModel.requiresSpotifyAppInstall {
+                // Missing Spotify app case
+                Button("Download Spotify") {
+                    viewModel.openSpotifyDownloadPage()
+                    viewModel.showingMusicError = false
+                }
+                .pointingHandCursor()
+                Button("Dismiss", role: .cancel) {
+                    viewModel.showingMusicError = false
+                }
+                .pointingHandCursor()
+            } else {
+                // Generic playback error case
+                Button("Continue Without Music") {
+                    viewModel.showingMusicError = false
+                }
+                .pointingHandCursor()
+                Button("Dismiss", role: .cancel) {
+                    viewModel.showingMusicError = false
+                }
+                .pointingHandCursor()
             }
         } message: {
             Text(viewModel.errorMessage ?? "Unable to start music playback. Make sure Spotify is open on this device.")
         }
+        .background(Color.black.ignoresSafeArea())
     }
     
-    // MARK: - Controls Overlay
-    
-    private var controlsOverlay: some View {
-        ZStack {
-            // Top bar - Close button and progress
-            VStack {
-                HStack {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 32))
-                            .foregroundStyle(.white)
-                            .shadow(radius: 4)
-                    }
-                    .buttonStyle(.plain)
-                    .keyboardShortcut(.cancelAction)
-                    
-                    Spacer()
-                    
-                    Text(viewModel.progressText)
-                        .font(.caption)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(.black.opacity(0.6))
-                        .clipShape(Capsule())
-                }
-                .padding()
-                
-                Spacer()
-            }
-            
-            // Bottom bar - Playback and music controls
-            VStack {
-                Spacer()
-                
-                HStack(spacing: 24) {
-                    // Slide controls
-                    Button {
-                        viewModel.previousSlide()
-                        onMouseActivity()
-                    } label: {
-                        Image(systemName: "backward.fill")
-                            .font(.title2)
-                            .foregroundStyle(.white)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(!viewModel.hasPreviousSlide)
-                    .opacity(viewModel.hasPreviousSlide ? 1.0 : 0.3)
-                    
-                    Button {
-                        viewModel.togglePlayPause()
-                        onMouseActivity()
-                    } label: {
-                        Image(systemName: viewModel.isPlaying ? "pause.fill" : "play.fill")
-                            .font(.title)
-                            .foregroundStyle(.white)
-                    }
-                    .buttonStyle(.plain)
-                    
-                    Button {
-                        viewModel.nextSlide()
-                        onMouseActivity()
-                    } label: {
-                        Image(systemName: "forward.fill")
-                            .font(.title2)
-                            .foregroundStyle(.white)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(!viewModel.hasNextSlide)
-                    .opacity(viewModel.hasNextSlide ? 1.0 : 0.3)
-                    
-                    // Music controls (if music is playing)
-                    if let playbackState = viewModel.currentPlaybackState {
-                        Rectangle()
-                            .fill(.white.opacity(0.3))
-                            .frame(width: 1, height: 30)
-                        
-                        musicControls(playbackState: playbackState)
-                    }
-                }
-                .padding(.horizontal, 40)
-                .padding(.vertical, 20)
-                .background(.black.opacity(0.6))
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .padding(.bottom, 40)
-            }
+    // MARK: - Bridge state syncing
+
+    private func syncPlaybackBridge() {
+        // Slideshow / image state
+        playbackBridge.currentSlideIndex = viewModel.currentIndex
+        playbackBridge.totalSlides = viewModel.loadedImages.count
+        playbackBridge.isSlideshowPlaying = viewModel.isPlaying
+
+        // Music / normalized playback state
+        let state = viewModel.normalizedPlaybackState
+
+        if let title = state.trackName, !title.isEmpty {
+            playbackBridge.currentTrackTitle = title
+            playbackBridge.currentTrackArtist = state.artistName ?? ""
+            playbackBridge.isMusicPlaying = state.isPlaying
+        } else {
+            playbackBridge.currentTrackTitle = ""
+            playbackBridge.currentTrackArtist = ""
+            playbackBridge.isMusicPlaying = false
         }
-    }
-    
-    // MARK: - Music Controls
-    
-    @ViewBuilder
-    private func musicControls(playbackState: SpotifyPlaybackState) -> some View {
-        HStack(spacing: 16) {
-            // Previous track
-            Button {
-                Task {
-                    await viewModel.skipToPreviousTrack()
-                    onMouseActivity()
-                }
-            } label: {
-                Image(systemName: "backward.end.fill")
-                    .font(.body)
-                    .foregroundStyle(.white)
-            }
-            .buttonStyle(.plain)
-            
-            // Play/pause music
-            Button {
-                Task {
-                    await viewModel.toggleMusicPlayPause()
-                    onMouseActivity()
-                }
-            } label: {
-                Image(systemName: playbackState.isPlaying ? "pause.circle" : "play.circle")
-                    .font(.title3)
-                    .foregroundStyle(.white)
-            }
-            .buttonStyle(.plain)
-            
-            // Next track
-            Button {
-                Task {
-                    await viewModel.skipToNextTrack()
-                    onMouseActivity()
-                }
-            } label: {
-                Image(systemName: "forward.end.fill")
-                    .font(.body)
-                    .foregroundStyle(.white)
-            }
-            .buttonStyle(.plain)
-            
-            // Current song info
-            if let track = playbackState.item {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(track.name)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                    
-                    Text(track.artistNames)
-                        .font(.caption2)
-                        .foregroundStyle(.white.opacity(0.7))
-                        .lineLimit(1)
-                }
-                .frame(maxWidth: 200, alignment: .leading)
-            }
-        }
-    }
-    
-    // MARK: - Mouse Activity Tracking
-    
-    private func onMouseActivity() {
-        lastMouseMovement = Date()
-        
-        withAnimation(.easeInOut(duration: 0.2)) {
-            showControls = true
-        }
-        
-        // Reset auto-hide timer
-        controlsTimer?.invalidate()
-        controlsTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { _ in
-            if Date().timeIntervalSince(lastMouseMovement) >= 3.0 {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    showControls = false
-                }
-            }
-        }
+
+        playbackBridge.isShuffleEnabled = viewModel.isShuffleEnabled
+        playbackBridge.isRepeatAllEnabled = (viewModel.repeatMode == .all)
     }
 }

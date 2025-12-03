@@ -9,8 +9,11 @@ import SwiftUI
 
 /// Root main content view that manages section navigation
 struct AppMainView: View {
-    @State private var selectedSection: AppSection = .slideshows
+    @State private var selectedSection: AppSection = .nowPlaying
     @State private var showingUserProfile = false
+    @StateObject private var devicesViewModel = SpotifyDevicesViewModel()
+
+    @EnvironmentObject private var nowPlayingStore: NowPlayingStore
     
     var body: some View {
         VStack(spacing: 0) {
@@ -19,7 +22,7 @@ struct AppMainView: View {
                 appTitleTop: "Electric",
                 appTitleBottom: "Slideshow",
                 currentSectionTitle: selectedSection.title,
-                sections: [.slideshows, .music, .settings, .user],
+                sections: [.nowPlaying, .slideshows, .music, .settings, .user],
                 selectedSection: selectedSection,
                 onSectionSelected: { section in
                     handleSectionSelection(section)
@@ -32,12 +35,20 @@ struct AppMainView: View {
             // Bottom: Section Content
             ZStack {
                 switch selectedSection {
+                case .nowPlaying:
+                    NowPlayingView()
                 case .slideshows:
-                    SlideshowsListView()
+                    SlideshowsListView { slideshow in
+                        // 1. Set the global "now playing" slideshow
+                        nowPlayingStore.activeSlideshow = slideshow
+
+                        // 2. Navigate to the Now Playing section
+                        selectedSection = .nowPlaying
+                    }
                 case .music:
                     PlaylistsView()
-                    case .settings:
-                        SettingsDashboardView()
+                case .settings:
+                    SettingsDashboardView(devicesViewModel: devicesViewModel)
                 case .user:
                     UserPlaceholderView()
                 }
