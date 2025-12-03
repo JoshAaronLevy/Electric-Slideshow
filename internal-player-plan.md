@@ -2,13 +2,51 @@
 
 > Goal: ship a fully embedded Spotify playback experience without requiring the external Spotify app. This plan is split into concrete stages so we can execute incrementally and validate at each step. Every stage lists code touchpoints across the macOS app (`Electric Slideshow`) and the backend (`electric-slideshow-server`).
 
-## Stage 0 – Prerequisites & Research
-- **Confirm licensing/compliance**: Spotify Web Playback SDK requires Premium and prohibits certain commercial uses. Document approval or constraints.
-- **Select Chromium embedding strategy**: choose between Chromium Embedded Framework (CEF) or a lightweight Electron/Chromium helper. Recommendation: CEF for tighter UI integration. Capture pros/cons, binary size, signing implications in this doc.
-- **Environment verification**: build a standalone prototype CEF app that loads `internal_player.html` and confirm Widevine DRM works (device shows up in Spotify Connect).
-- **Build pipeline prep**:
-  - Update Xcode project to support additional helper targets/binaries (CEF subprocesses).
-  - Ensure CI/CD can notarize/sign larger app bundle.
+## Stage 0 – Prerequisites & Research (CEF-focused)
+
+### 0.1  Spotify licensing & compliance audit
+- Confirm the Spotify account used in development has Premium (Web Playback SDK hard requirement) and document that MVP will require Premium end-users.
+- Review and log the Web Playback SDK Terms + Developer Policy items that impact us:
+   - No caching/downloading of audio; playback must be streaming only.
+   - Internal player cannot be used in commercial hardware integrations without additional approval.
+   - App must show standard Spotify branding and attribution if player UI becomes visible (capture what “non-visual” mode requires).
+- Draft a short compliance matrix in `docs/spotify-compliance.md` (owner: Josh) covering current status, gaps, and any legal follow-ups.
+- Exit criteria: compliance doc signed off by product + legal stakeholders (email acknowledgement is fine for MVP).
+
+### 0.2  Chromium strategy decision (CEF)
+- We will embed **Chromium Embedded Framework (CEF)** directly to keep everything inside the main window.
+- Document pros/cons (for future reference) in the plan:
+   - ✅ Tight SwiftUI integration, no extra helper app UI, consistent lifecycle.
+   - ✅ Better control over navigation sandboxing.
+   - ❌ Larger binary (~250 MB uncompressed) and extra helper processes to codesign.
+   - ❌ Manual updates when Chrome releases security patches.
+- List required frameworks/binaries: `Chromium Embedded Framework.framework`, helper executables (`cefclient Helper`, `cefclient Helper (GPU)`, `cefclient Helper (Renderer)`), locales, resources, Swift bridging headers.
+- Capture signing/notarization implications:
+   - Each helper must be codesigned with the same Team ID and included in the notarization submission.
+   - Xcode project needs additional Run Script phase to re-sign helpers after copying CEF payload.
+- Exit criteria: architecture note (1–2 pages) stored in `docs/internal-player/cef-architecture.md` describing the above and approved by engineering lead.
+
+### 0.3  Standalone CEF prototype
+- Build a minimal macOS app (outside main repo or inside `Prototypes/CEFPlayer/`) that:
+   1. Loads CEF minimal distribution (matching Chrome stable version).
+   2. Opens a single window pointing to `https://electric-slideshow-server.onrender.com/internal-player`.
+   3. Exposes a console/log so we can see `playerEvent` messages.
+- Verification steps:
+   - Inject a valid Spotify access token manually (temporary UI button) and ensure `player.connect()` succeeds (device shows in `spotify.com/pair` or the mobile app).
+   - Capture logs/screenshots proving Widevine works (device ID, `connectResult: connected`).
+   - Measure cold-start time and memory footprint of the prototype for baseline metrics.
+- Exit criteria: prototype repo committed, README explains manual steps, and we have proof that DRM works inside CEF.
+
+### 0.4  Build pipeline & project preparation
+- **Repository layout**: create `ThirdParty/CEF/README.md` documenting download source, version, and hash for the CEF bundle. Add Git LFS or alternate storage if the bundle is too large for Git.
+- **Xcode project changes** (design only for Stage 0):
+   - Plan new targets for CEF helpers or adopt the official CEF Xcode template.
+   - Identify where to place CEF resources within the `.app` bundle (`Contents/Frameworks/Chromium Embedded Framework.framework`).
+- **CI/CD impact**:
+   - Update build agents to install `xcode-select --switch` version that supports hardened runtime signing of nested frameworks.
+   - Ensure notarization pipeline can handle >1 GB artifacts (CEF inflates zipped app size).
+- Produce a checklist (`docs/internal-player/stage0-checklist.md`) enumerating all tasks above with owners/dates so Stage 1 can consume it.
+- Exit criteria: checklist complete, stakeholders agree that requirements are satisfied, and Stage 1 tickets can be created.
 
 ## Stage 1 – Backend Hardening & Telemetry (already started)
 1. **Finalize telemetry** (done in previous commit) – ensure `internal_player.html` reports DRM/connection failures.
