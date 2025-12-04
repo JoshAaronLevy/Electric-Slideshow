@@ -9,6 +9,8 @@ const TARGET_URL_MATCH = process.env.CEF_TARGET_URL_MATCH || 'internal-player';
 if (!TOKEN) {
   console.error('[inject_token] Missing SPOTIFY_ACCESS_TOKEN environment variable');
   process.exit(1);
+} else {
+  console.log('SPOTIFY_ACCESS_TOKEN: ', TOKEN);
 }
 
 async function waitForTarget(timeoutMs = 10000, intervalMs = 500) {
