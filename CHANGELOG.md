@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog,
 and this project adheres to Semantic Versioning.
 
+## [1.2.1] - 2025-12-04
+
+### Added
+- Drafted `INTERNAL_PLAYER_SWIFT_PLAN.md` documenting Stage 0 of the internal Spotify player integration (manager placement, lifecycle hooks, UI surface, and launch process).
+
 ## [1.2.0] - 2025-11-23
 
 ### Added
