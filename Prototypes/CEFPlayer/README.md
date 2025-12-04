@@ -28,6 +28,7 @@ Goal: verify that the Spotify Web Playback SDK works inside Chromium Embedded Fr
    SPOTIFY_ACCESS_TOKEN="<token>" npm run inject-token
    ```
    - The script uses Chrome DevTools Protocol to call `INTERNAL_PLAYER.setAccessToken` inside cefclient.
+   - **Important:** `SPOTIFY_ACCESS_TOKEN` must be an actual OAuth access token (e.g. from the existing PKCE flow), *not* the app’s client ID.
    - `inject_token.js` waits for the target page to be ready, so you can run it immediately after launching the prototype.
    - Watch your terminal for `token_sent` and the CEF console for `connectResult: connected`.
 

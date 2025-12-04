@@ -4,11 +4,31 @@ set -euo pipefail
 # Simple helper to fetch the macOS CEF minimal distribution we’ll use for the
 # internal Spotify player prototype. Adjust CEF_VERSION / CEF_BUILD as needed.
 
-CEF_VERSION="120.0.1+g1234567"
+CEF_VERSION=${CEF_VERSION:-}
+CEF_DOWNLOAD_URL=${CEF_DOWNLOAD_URL:-}
 CEF_PLATFORM="macosx64"
-CEF_FILENAME="cef_binary_${CEF_VERSION}_${CEF_PLATFORM}_minimal"
+
+VERSION_FILE="$(cd "$(dirname "$0")/.." && pwd)/ThirdParty/CEF/version.txt"
+
+if [[ -z "${CEF_DOWNLOAD_URL}" ]]; then
+  if [[ -z "${CEF_VERSION}" && -f "${VERSION_FILE}" ]]; then
+    CEF_VERSION=$(cat "${VERSION_FILE}" | tr -d '\n')
+  fi
+  if [[ -z "${CEF_VERSION}" ]]; then
+    cat <<'EOF' >&2
+[download_cef] ERROR: No CEF_VERSION provided.
+Set CEF_VERSION env var (e.g. CEF_VERSION="123.0.4+g15c09fa") or create ThirdParty/CEF/version.txt.
+Visit https://cef-builds.spotifycdn.com/ to copy a valid version string from the macOS minimal build.
+EOF
+    exit 1
+  fi
+  CEF_FILENAME="cef_binary_${CEF_VERSION}_${CEF_PLATFORM}_minimal"
+  CEF_DOWNLOAD_URL="https://cef-builds.spotifycdn.com/${CEF_FILENAME}.zip"
+else
+  CEF_FILENAME=$(basename "${CEF_DOWNLOAD_URL}" .zip)
+fi
+
 CEF_ZIP="${CEF_FILENAME}.zip"
-CEF_URL="https://cef-builds.spotifycdn.com/${CEF_ZIP}"
 CACHE_DIR="$(cd "$(dirname "$0")/.." && pwd)/ThirdParty/CEF/.cache"
 OUT_DIR="$(cd "$(dirname "$0")/.." && pwd)/ThirdParty/CEF/${CEF_FILENAME}"
 SHA_FILE="${OUT_DIR}.sha256"
@@ -24,8 +44,8 @@ if [[ -f "${OUT_DIR}/README.txt" ]]; then
 fi
 
 if [[ ! -f "${ZIP_PATH}" ]]; then
-  echo "[download_cef] Downloading ${CEF_URL}"
-  curl -#fLo "${ZIP_PATH}" "${CEF_URL}"
+  echo "[download_cef] Downloading ${CEF_DOWNLOAD_URL}"
+  curl -#fLo "${ZIP_PATH}" "${CEF_DOWNLOAD_URL}"
 else
   echo "[download_cef] Using cached archive ${ZIP_PATH}"
 fi

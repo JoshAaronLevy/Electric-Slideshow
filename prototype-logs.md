@@ -1,32 +1,36 @@
-☁  Electric Slideshow [playlist-view] chmod +x ./scripts/download_cef.sh
-./scripts/download_cef.sh
-[download_cef] Downloading https://cef-builds.spotifycdn.com/cef_binary_120.0.1+g1234567_macosx64_minimal.zip
-curl: (22) The requested URL returned error: 404
+# Updated instructions for running the CEF prototype (2025-12-04)
 
-☁  Electric Slideshow [playlist-view] chmod +x ./Prototypes/CEFPlayer/run_cef_player.sh
-./Prototypes/CEFPlayer/run_cef_player.sh
-[download_cef] Downloading https://cef-builds.spotifycdn.com/cef_binary_120.0.1+g1234567_macosx64_minimal.zip
-curl: (22) The requested URL returned error: 404
+1. **Pick a real CEF build**
+  - Visit https://cef-builds.spotifycdn.com/ and copy the version string from a macOS *minimal* build (e.g. `123.0.4+g15c09fa`).
+  ```bash
+  echo "123.0.4+g15c09fa" > ThirdParty/CEF/version.txt
+  # (or run download script with CEF_VERSION="..." prefixed)
+  ```
 
-☁  Electric Slideshow [playlist-view] cd Prototypes/CEFPlayer
-npm install
+2. **Download & extract CEF**
+  ```bash
+  ./scripts/download_cef.sh
+  ```
 
-up to date, audited 4 packages in 1s
+3. **Launch the prototype browser**
+  ```bash
+  ./Prototypes/CEFPlayer/run_cef_player.sh
+  ```
+  This opens `cefclient` pointed at `https://electric-slideshow-server.onrender.com/internal-player` with DevTools on port 9223.
 
-found 0 vulnerabilities
-☁  CEFPlayer [playlist-view] SPOTIFY_ACCESS_TOKEN="a5420653f68e4295b5a8fbca7b98cd3a" npm run inject-token
+4. **Install tooling (first run only)**
+  ```bash
+  cd Prototypes/CEFPlayer
+  npm install
+  ```
 
-> cefplayer-prototype@0.1.0 inject-token
-> node inject_token.js
+5. **Inject Spotify token automatically**
+  ```bash
+  SPOTIFY_ACCESS_TOKEN="<oauth-access-token>" npm run inject-token
+  ```
+  - Token must be a real Spotify OAuth access token (scopes: `streaming`, `user-read-playback-state`, `user-modify-playback-state`).
+  - The script waits for `cefclient` to expose its DevTools target and then calls `INTERNAL_PLAYER.setAccessToken(...)`.
 
-[inject_token] Waiting for DevTools target on localhost:9223
-file:///Users/joshlevy/Desktop/Electric%20Slideshow/Prototypes/CEFPlayer/inject_token.js:26
-  throw new Error(`Timed out waiting for DevTools target containing "${TARGET_URL_MATCH}"`);
-        ^
-
-Error: Timed out waiting for DevTools target containing "internal-player"
-    at waitForTarget (file:///Users/joshlevy/Desktop/Electric%20Slideshow/Prototypes/CEFPlayer/inject_token.js:26:9)
-    at async file:///Users/joshlevy/Desktop/Electric%20Slideshow/Prototypes/CEFPlayer/inject_token.js:39:18
-
-Node.js v20.17.0
-☁  CEFPlayer [playlist-view]
+6. **Verify**
+  - Watch the terminal for `token_sent` and the CEF logs for `connectResult: connected` + device ID.
+  - Use Spotify Connect to transfer playback to "Electric Slideshow Internal Player" and capture metrics.
