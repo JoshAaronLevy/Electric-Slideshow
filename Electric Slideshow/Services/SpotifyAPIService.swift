@@ -329,10 +329,21 @@ final class SpotifyAPIService: ObservableObject {
         throw PlaybackError.generic(message: errorBody)
     }
     
-    func pausePlayback() async throws {
-        let url = baseURL.appendingPathComponent("me/player/pause")
+    func pausePlayback(deviceId: String? = nil) async throws {
+        var components = URLComponents(
+            url: baseURL.appendingPathComponent("me/player/pause"),
+            resolvingAgainstBaseURL: false
+        )!
+        if let deviceId {
+            components.queryItems = [URLQueryItem(name: "device_id", value: deviceId)]
+        }
+
+        guard let url = components.url else {
+            throw APIError.playbackFailed
+        }
+
         let token = try await authService.getValidAccessToken()
-        
+
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -387,14 +398,19 @@ final class SpotifyAPIService: ObservableObject {
 
     /// Seeks the current track to the given position (in milliseconds).
     func seekToPosition(positionMs: Int) async throws {
-        // Build URL: /me/player/seek?position_ms=...
+        try await seek(to: positionMs)
+    }
+
+    func seek(to positionMs: Int, deviceId: String? = nil) async throws {
         var components = URLComponents(
             url: baseURL.appendingPathComponent("me/player/seek"),
             resolvingAgainstBaseURL: false
         )!
-        components.queryItems = [
-            URLQueryItem(name: "position_ms", value: "\(positionMs)")
-        ]
+        var queryItems = [URLQueryItem(name: "position_ms", value: "\(positionMs)")]
+        if let deviceId {
+            queryItems.append(URLQueryItem(name: "device_id", value: deviceId))
+        }
+        components.queryItems = queryItems
 
         guard let url = components.url else {
             throw APIError.playbackFailed
@@ -418,21 +434,66 @@ final class SpotifyAPIService: ObservableObject {
             throw APIError.playbackFailed
         }
     }
-    
-    func skipToNext() async throws {
-        let url = baseURL.appendingPathComponent("me/player/next")
+
+    func setVolume(_ volumePercent: Int, deviceId: String? = nil) async throws {
+        var components = URLComponents(
+            url: baseURL.appendingPathComponent("me/player/volume"),
+            resolvingAgainstBaseURL: false
+        )!
+        var queryItems = [URLQueryItem(name: "volume_percent", value: "\(volumePercent)")]
+        if let deviceId {
+            queryItems.append(URLQueryItem(name: "device_id", value: deviceId))
+        }
+        components.queryItems = queryItems
+
+        guard let url = components.url else {
+            throw APIError.playbackFailed
+        }
+
         let token = try await authService.getValidAccessToken()
-        
+
         var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        request.httpMethod = "PUT"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        
+
         let (data, response) = try await URLSession.shared.data(for: request)
-        
+
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.playbackFailed
         }
-        
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let errorBody = String(data: data, encoding: .utf8) ?? "(no body)"
+            print("[SpotifyAPI] ERROR: Set volume failed with \(httpResponse.statusCode): \(errorBody)")
+            throw APIError.playbackFailed
+        }
+    }
+
+    func skipToNext(deviceId: String? = nil) async throws {
+        var components = URLComponents(
+            url: baseURL.appendingPathComponent("me/player/next"),
+            resolvingAgainstBaseURL: false
+        )!
+        if let deviceId {
+            components.queryItems = [URLQueryItem(name: "device_id", value: deviceId)]
+        }
+
+        guard let url = components.url else {
+            throw APIError.playbackFailed
+        }
+
+        let token = try await authService.getValidAccessToken()
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.playbackFailed
+        }
+
         guard (200...299).contains(httpResponse.statusCode) else {
             let errorBody = String(data: data, encoding: .utf8) ?? "(no body)"
             print("[SpotifyAPI] ERROR: Skip to next failed with \(httpResponse.statusCode): \(errorBody)")
@@ -440,20 +501,31 @@ final class SpotifyAPIService: ObservableObject {
         }
     }
     
-    func skipToPrevious() async throws {
-        let url = baseURL.appendingPathComponent("me/player/previous")
+    func skipToPrevious(deviceId: String? = nil) async throws {
+        var components = URLComponents(
+            url: baseURL.appendingPathComponent("me/player/previous"),
+            resolvingAgainstBaseURL: false
+        )!
+        if let deviceId {
+            components.queryItems = [URLQueryItem(name: "device_id", value: deviceId)]
+        }
+
+        guard let url = components.url else {
+            throw APIError.playbackFailed
+        }
+
         let token = try await authService.getValidAccessToken()
-        
+
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        
+
         let (data, response) = try await URLSession.shared.data(for: request)
-        
+
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.playbackFailed
         }
-        
+
         guard (200...299).contains(httpResponse.statusCode) else {
             let errorBody = String(data: data, encoding: .utf8) ?? "(no body)"
             print("[SpotifyAPI] ERROR: Skip to previous failed with \(httpResponse.statusCode): \(errorBody)")
