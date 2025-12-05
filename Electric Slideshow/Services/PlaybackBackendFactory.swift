@@ -22,9 +22,6 @@ struct PlaybackBackendFactory {
 
     /// Cached internal backend so we can reuse the same instance.
     private static var sharedInternalBackend: SpotifyInternalPlaybackBackend?
-    
-    /// Shared InternalPlayerManager instance
-    private static var sharedPlayerManager: InternalPlayerManager?
 
     static func makeBackend(
         mode: PlaybackBackendMode = defaultMode,
@@ -46,12 +43,8 @@ struct PlaybackBackendFactory {
                 return cached
             }
             
-            // Create or reuse the player manager
-            let playerManager = sharedPlayerManager ?? InternalPlayerManager()
-            sharedPlayerManager = playerManager
-            
             let backend = SpotifyInternalPlaybackBackend(
-                playerManager: playerManager,
+                playerManager: InternalPlayerManager.shared,
                 apiService: apiService,
                 authService: spotifyAuthService
             )
@@ -75,6 +68,14 @@ struct PlaybackBackendFactory {
                 "Reusing cached internal backend instance",
                 source: "PlaybackBackendFactory"
             )
+            if !cached.isReady {
+                print("[PlaybackBackendFactory] Cached internal backend not ready, re-initializing")
+                PlayerInitLogger.shared.log(
+                    "Cached internal backend not ready, re-initializing",
+                    source: "PlaybackBackendFactory"
+                )
+                cached.initialize()
+            }
             return cached
         }
         
@@ -84,12 +85,8 @@ struct PlaybackBackendFactory {
             source: "PlaybackBackendFactory"
         )
         
-        // Create or reuse the player manager
-        let playerManager = sharedPlayerManager ?? InternalPlayerManager()
-        sharedPlayerManager = playerManager
-        
         let backend = SpotifyInternalPlaybackBackend(
-            playerManager: playerManager,
+            playerManager: InternalPlayerManager.shared,
             apiService: apiService,
             authService: spotifyAuthService
         )

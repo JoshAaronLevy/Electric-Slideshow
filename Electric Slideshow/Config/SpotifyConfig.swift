@@ -10,6 +10,7 @@ import Foundation
 struct SpotifyConfig {
     static let clientId = "a5420653f68e4295b5a8fbca7b98cd3a"
     static let redirectURI = "com.electricslideshow://callback"
+    static let backendBaseURL = URL(string: "https://electric-slideshow-server.onrender.com")!
     static let tokenExchangeURL = URL(string: "https://electric-slideshow-server.onrender.com/auth/spotify/token")!
     static let tokenRefreshURL = URL(string: "https://electric-slideshow-server.onrender.com/auth/spotify/refresh")!
     static let internalPlayerURL = URL(string: "https://electric-slideshow-server.onrender.com/internal-player")!

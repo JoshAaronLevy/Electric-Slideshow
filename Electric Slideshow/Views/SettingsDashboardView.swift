@@ -259,7 +259,7 @@ struct InternalPlayerDebugSheet: View {
                     .disabled(internalPlayerManager.isRunning || isStarting)
                     
                     Button {
-                        internalPlayerManager.stop()
+                        internalPlayerManager.stopInternalPlayer()
                         errorMessage = nil
                     } label: {
                         HStack {
@@ -311,7 +311,10 @@ struct InternalPlayerDebugSheet: View {
                 let token = try await spotifyAuthService.getValidAccessToken()
                 
                 // Start the internal player
-                try internalPlayerManager.start(withAccessToken: token)
+                try internalPlayerManager.ensureInternalPlayerRunning(
+                    accessToken: token,
+                    backendBaseURL: SpotifyConfig.backendBaseURL
+                )
                 
                 isStarting = false
             } catch {

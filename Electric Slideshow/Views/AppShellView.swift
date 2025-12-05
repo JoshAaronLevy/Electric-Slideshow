@@ -17,6 +17,8 @@ struct AppShellView: View {
     @State private var showingSpotifyReauthAlert = false
     @State private var spotifyReauthMessage: String?
     @State private var prewarmedPlaybackBackend: MusicPlaybackBackend?
+    @State private var hasPrewarmedInternalBackend = false
+    @State private var hasLoggedPrewarmSuccess = false
     
     // Player initialization error alert
     @State private var showingPlayerInitError = false
@@ -100,7 +102,7 @@ struct AppShellView: View {
     private func prewarmInternalPlayerIfNeeded() {
         // Only prewarm when the internal player is the selected backend.
         guard PlaybackBackendFactory.defaultMode == .internalWebPlayer else {
-            print("[AppShellView] Skipping player pre-warm: Backend mode is not internal web player")
+            print("[AppShell] Skipping player pre-warm: Backend mode is not internal web player")
             PlayerInitLogger.shared.log(
                 "Skipping player pre-warm: Backend mode is not internal web player",
                 source: "AppShellView"
@@ -108,24 +110,24 @@ struct AppShellView: View {
             return
         }
         guard spotifyAuthService.isAuthenticated else {
-            print("[AppShellView] Skipping player pre-warm: User is not authenticated")
+            print("[AppShell] Skipping player pre-warm: User is not authenticated")
             PlayerInitLogger.shared.log(
                 "Skipping player pre-warm: User is not authenticated",
                 source: "AppShellView"
             )
             return
         }
-        guard prewarmedPlaybackBackend == nil else {
-            print("[AppShellView] Skipping player pre-warm: Backend already prewarmed")
+        guard !hasPrewarmedInternalBackend else {
+            print("[AppShell] Skipping player pre-warm: Backend already prewarmed")
             PlayerInitLogger.shared.log(
                 "Skipping player pre-warm: Backend already prewarmed",
                 source: "AppShellView"
             )
             return
         }
-        print("[AppShellView] Triggering internal player pre-warm")
+        print("[AppShell] Prewarming internal playback backend…")
         PlayerInitLogger.shared.log(
-            "Triggering internal player pre-warm",
+            "Prewarming internal playback backend…",
             source: "AppShellView"
         )
         
@@ -134,12 +136,25 @@ struct AppShellView: View {
         
         // Create backend and set up error callback
         let backend = PlaybackBackendFactory.prewarmInternalBackend(spotifyAPIService: spotifyAPIService)
+        hasPrewarmedInternalBackend = backend != nil
         
         // Wire up error callback to show alert with logs
         if let internalBackend = backend as? SpotifyInternalPlaybackBackend {
             internalBackend.onError = { error in
                 Task { @MainActor in
                     self.handlePlayerInitError(error)
+                }
+            }
+            
+            internalBackend.onReady = {
+                Task { @MainActor in
+                    guard !hasLoggedPrewarmSuccess else { return }
+                    hasLoggedPrewarmSuccess = true
+                    print("[AppShell] Internal playback backend prewarmed successfully.")
+                    PlayerInitLogger.shared.log(
+                        "Internal playback backend prewarmed successfully.",
+                        source: "AppShellView"
+                    )
                 }
             }
         }

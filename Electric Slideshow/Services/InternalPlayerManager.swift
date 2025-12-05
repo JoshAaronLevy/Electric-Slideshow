@@ -6,14 +6,15 @@
 //  Launches the player app with Spotify token injection via environment variables.
 //
 
-import Foundation
 import Combine
+import Foundation
 
 /// Errors that can occur when managing the internal player process
 enum InternalPlayerError: Error, LocalizedError {
     case invalidPath(String)
     case processLaunchFailed(String)
     case noAccessToken
+    case helperNotFound
     
     var errorDescription: String? {
         switch self {
@@ -23,16 +24,10 @@ enum InternalPlayerError: Error, LocalizedError {
             return "Failed to launch internal player: \(reason)"
         case .noAccessToken:
             return "No Spotify access token available"
+        case .helperNotFound:
+            return "Embedded internal player helper not found in app bundle"
         }
     }
-}
-
-/// Launch mode for the internal player
-enum InternalPlayerLaunchMode {
-    /// Development mode: runs from local repo with npm run dev
-    case dev
-    /// Production mode: runs from bundled .app
-    case bundled
 }
 
 /// Manages the lifecycle of the Electron internal player process
@@ -45,6 +40,8 @@ final class InternalPlayerManager: ObservableObject {
     /// Example: "/Users/yourname/Projects/electric-slideshow-internal-player"
     static let defaultDevRepoPath = "/Users/joshlevy/Desktop/electric-slideshow-internal-player"
     
+    static let shared = InternalPlayerManager()
+    
     // MARK: - Published State
     
     @Published private(set) var isRunning: Bool = false
@@ -53,46 +50,65 @@ final class InternalPlayerManager: ObservableObject {
     // MARK: - Private Properties
     
     private var process: Process?
-    private let launchMode: InternalPlayerLaunchMode
     private let devRepoPath: String
     
     // MARK: - Initialization
     
     init(
-        launchMode: InternalPlayerLaunchMode = .dev,
         devRepoPath: String = InternalPlayerManager.defaultDevRepoPath
     ) {
-        self.launchMode = launchMode
         self.devRepoPath = devRepoPath
     }
     
     // MARK: - Public API
     
-    /// Starts the internal player with the provided Spotify access token
-    /// - Parameter token: Valid Spotify access token for Web Playback SDK
-    /// - Throws: InternalPlayerError if the process cannot be launched
-    func start(withAccessToken token: String) throws {
-        guard !isRunning else {
-            print("[InternalPlayerManager] Internal player already running")
+    func ensureInternalPlayerRunning(accessToken: String, backendBaseURL: URL?) throws {
+        if let process, process.isRunning {
+            isRunning = true
+            print("[InternalPlayerManager] Internal player already running (pid \(process.processIdentifier)), reusing existing process")
+            PlayerInitLogger.shared.log(
+                "Internal player already running (pid \(process.processIdentifier)), reusing existing process",
+                source: "InternalPlayerManager"
+            )
             return
         }
         
-        // Log token prefix only for security
-        let tokenPrefix = String(token.prefix(8))
-        print("[InternalPlayerManager] Using token prefix: \(tokenPrefix)…")
-        
-        switch launchMode {
-        case .dev:
-            try startDevMode(token: token)
-        case .bundled:
-            try startBundledMode(token: token)
+        try startInternalPlayer(accessToken: accessToken, backendBaseURL: backendBaseURL)
+    }
+    
+    /// Starts the internal player with the provided Spotify access token
+    /// - Throws: InternalPlayerError if the process cannot be launched
+    func startInternalPlayer(accessToken: String, backendBaseURL: URL?) throws {
+        guard process?.isRunning != true else {
+            isRunning = true
+            print("[InternalPlayerManager] Start requested but process already running (pid \(process?.processIdentifier ?? 0))")
+            PlayerInitLogger.shared.log(
+                "Start requested but process already running (pid \(process?.processIdentifier ?? 0))",
+                source: "InternalPlayerManager"
+            )
+            return
         }
+        
+        let environment = buildEnvironment(accessToken: accessToken, backendBaseURL: backendBaseURL)
+        
+        #if DEBUG
+        try launchDevProcess(environment: environment)
+        #else
+        try launchBundledProcess(environment: environment)
+        #endif
     }
     
     /// Stops the internal player process
-    func stop() {
-        guard let process = process, process.isRunning else {
+    func stopInternalPlayer() {
+        guard let process else {
             print("[InternalPlayerManager] No running process to stop")
+            isRunning = false
+            return
+        }
+        
+        guard process.isRunning else {
+            print("[InternalPlayerManager] Process already stopped")
+            self.process = nil
             isRunning = false
             return
         }
@@ -108,13 +124,47 @@ final class InternalPlayerManager: ObservableObject {
                 self.process = nil
                 self.isRunning = false
                 print("[InternalPlayerManager] Internal player stopped")
+                PlayerInitLogger.shared.log(
+                    "Internal player stopped",
+                    source: "InternalPlayerManager"
+                )
             }
         }
     }
     
     // MARK: - Private Helpers
     
-    private func startDevMode(token: String) throws {
+    private func buildEnvironment(accessToken: String, backendBaseURL: URL?) -> [String: String] {
+        var environment = ProcessInfo.processInfo.environment
+        environment["SPOTIFY_ACCESS_TOKEN"] = accessToken
+        environment["ELECTRIC_SLIDESHOW_MODE"] = "internal-player"
+        if let backendBaseURL {
+            environment["ELECTRIC_BACKEND_BASE_URL"] = backendBaseURL.absoluteString
+        }
+        print("[InternalPlayerManager] Environment set (token prefix \(accessToken.prefix(6))…, backend url set: \(backendBaseURL != nil))")
+        PlayerInitLogger.shared.log(
+            "Environment set (token prefix \(accessToken.prefix(6))…, backend url set: \(backendBaseURL != nil))",
+            source: "InternalPlayerManager"
+        )
+        return environment
+    }
+    
+    private func attachTerminationHandler(to process: Process) {
+        process.terminationHandler = { [weak self] process in
+            Task { @MainActor in
+                print("[InternalPlayerManager] Process terminated with status: \(process.terminationStatus)")
+                PlayerInitLogger.shared.log(
+                    "Process terminated with status: \(process.terminationStatus)",
+                    source: "InternalPlayerManager"
+                )
+                self?.process = nil
+                self?.isRunning = false
+            }
+        }
+    }
+    
+    #if DEBUG
+    private func launchDevProcess(environment: [String: String]) throws {
         let repoURL = URL(fileURLWithPath: devRepoPath)
         
         // Verify the path exists
@@ -137,41 +187,18 @@ final class InternalPlayerManager: ObservableObject {
             source: "InternalPlayerManager"
         )
         
-        // Create process
         let newProcess = Process()
         newProcess.currentDirectoryURL = repoURL
         newProcess.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         newProcess.arguments = ["npm", "run", "dev"]
-        
-        // Set up environment with token
-        var environment = ProcessInfo.processInfo.environment
-        environment["SPOTIFY_ACCESS_TOKEN"] = token
-        environment["ELECTRIC_SLIDESHOW_MODE"] = "internal-player"
-        print("[InternalPlayerManager] Setting environment variables: SPOTIFY_ACCESS_TOKEN, ELECTRIC_SLIDESHOW_MODE")
-        PlayerInitLogger.shared.log(
-            "Setting environment variables: SPOTIFY_ACCESS_TOKEN, ELECTRIC_SLIDESHOW_MODE",
-            source: "InternalPlayerManager"
-        )
         newProcess.environment = environment
         
-        // Set up termination handler
-        newProcess.terminationHandler = { [weak self] process in
-            Task { @MainActor in
-                print("[InternalPlayerManager] Process terminated with status: \(process.terminationStatus)")
-                PlayerInitLogger.shared.log(
-                    "Process terminated with status: \(process.terminationStatus)",
-                    source: "InternalPlayerManager"
-                )
-                self?.process = nil
-                self?.isRunning = false
-            }
-        }
+        attachTerminationHandler(to: newProcess)
         
-        // Launch
         do {
             try newProcess.run()
-            self.process = newProcess
-            self.isRunning = true
+            process = newProcess
+            isRunning = true
             print("[InternalPlayerManager] Process launched with PID \(newProcess.processIdentifier)")
             PlayerInitLogger.shared.log(
                 "Process launched with PID \(newProcess.processIdentifier)",
@@ -189,11 +216,53 @@ final class InternalPlayerManager: ObservableObject {
             throw playerError
         }
     }
-    
-    private func startBundledMode(token: String) throws {
-        // TODO: Implement bundled mode once we have a packaged .app
-        print("[InternalPlayerManager] Bundled mode not yet implemented")
-        lastError = "Bundled mode is not yet implemented. Use dev mode for now."
-        throw InternalPlayerError.processLaunchFailed("Bundled mode not implemented")
+    #else
+    private func launchBundledProcess(environment: [String: String]) throws {
+        guard let helperURL = Bundle.main
+            .url(forResource: "ElectricSlideshowInternalPlayer", withExtension: "app")?
+            .appendingPathComponent("Contents/MacOS/ElectricSlideshowInternalPlayer") else {
+            let error = InternalPlayerError.helperNotFound
+            lastError = error.localizedDescription
+            print("[InternalPlayerManager] ERROR: Embedded helper not found in bundle")
+            PlayerInitLogger.shared.log(
+                "ERROR: Embedded helper not found in bundle",
+                source: "InternalPlayerManager"
+            )
+            throw error
+        }
+        
+        print("[InternalPlayerManager] Starting bundled internal player at \(helperURL.path)")
+        PlayerInitLogger.shared.log(
+            "Starting bundled internal player at \(helperURL.path)",
+            source: "InternalPlayerManager"
+        )
+        
+        let newProcess = Process()
+        newProcess.executableURL = helperURL
+        newProcess.environment = environment
+        
+        attachTerminationHandler(to: newProcess)
+        
+        do {
+            try newProcess.run()
+            process = newProcess
+            isRunning = true
+            print("[InternalPlayerManager] Bundled process launched with PID \(newProcess.processIdentifier)")
+            PlayerInitLogger.shared.log(
+                "Bundled process launched with PID \(newProcess.processIdentifier)",
+                source: "InternalPlayerManager"
+            )
+            lastError = nil
+        } catch {
+            let playerError = InternalPlayerError.processLaunchFailed(error.localizedDescription)
+            lastError = playerError.localizedDescription
+            print("[InternalPlayerManager] ERROR: Bundled process launch failed: \(error.localizedDescription)")
+            PlayerInitLogger.shared.log(
+                "ERROR: Bundled process launch failed: \(error.localizedDescription)",
+                source: "InternalPlayerManager"
+            )
+            throw playerError
+        }
     }
+    #endif
 }

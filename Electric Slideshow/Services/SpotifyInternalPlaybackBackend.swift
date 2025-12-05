@@ -15,6 +15,7 @@ final class SpotifyInternalPlaybackBackend: MusicPlaybackBackend {
 
     var onStateChanged: ((PlaybackState) -> Void)?
     var onError: ((PlaybackError) -> Void)?
+    var onReady: (() -> Void)?
 
     private(set) var isReady: Bool = false
     var requiresExternalApp: Bool { false }
@@ -25,6 +26,9 @@ final class SpotifyInternalPlaybackBackend: MusicPlaybackBackend {
 
     private var deviceId: String?
     private var isPollingDevice = false
+    private var isInitializing = false
+    private var hasNotifiedReady = false
+    private let internalDeviceName = "Electric Slideshow Internal Player"
 
     init(playerManager: InternalPlayerManager, apiService: SpotifyAPIService, authService: SpotifyAuthService) {
         self.playerManager = playerManager
@@ -33,19 +37,41 @@ final class SpotifyInternalPlaybackBackend: MusicPlaybackBackend {
     }
 
     func initialize() {
-        print("[SpotifyInternalPlaybackBackend] Initializing - starting Electron player process")
+        guard !isInitializing else {
+            print("[SpotifyInternalPlaybackBackend] initialize called while already initializing; ignoring duplicate call")
+            return
+        }
+        isInitializing = true
+        
+        let backendBaseURL = SpotifyConfig.backendBaseURL
+        print("[SpotifyInternalPlaybackBackend] Initializing internal backend, booting internal player (backend base: \(backendBaseURL.absoluteString))")
         PlayerInitLogger.shared.log(
-            "Initializing - starting Electron player process",
+            "Initializing internal backend, booting internal player (backend base: \(backendBaseURL.absoluteString))",
             source: "SpotifyInternalPlaybackBackend"
         )
         
         Task { @MainActor in
+            defer { isInitializing = false }
             do {
                 // Get valid access token
                 let token = try await authService.getValidAccessToken()
                 
-                // Start the Electron process with the token
-                try playerManager.start(withAccessToken: token)
+                // Start or reuse the Electron process with the token
+                try playerManager.ensureInternalPlayerRunning(accessToken: token, backendBaseURL: backendBaseURL)
+                
+                if isReady, let deviceId {
+                    print("[SpotifyInternalPlaybackBackend] Internal backend already ready with device id \(deviceId); reusing existing session")
+                    PlayerInitLogger.shared.log(
+                        "Internal backend already ready with device id \(deviceId); reusing existing session",
+                        source: "SpotifyInternalPlaybackBackend"
+                    )
+                    return
+                }
+                
+                // Reset state before polling
+                deviceId = nil
+                isReady = false
+                hasNotifiedReady = false
                 
                 print("[SpotifyInternalPlaybackBackend] Electron process started, polling for device")
                 PlayerInitLogger.shared.log(
@@ -197,9 +223,13 @@ final class SpotifyInternalPlaybackBackend: MusicPlaybackBackend {
             for attempt in 1...maxAttempts {
                 do {
                     let devices = try await apiService.fetchAvailableDevices()
-                    if let internalDevice = devices.first(where: { $0.name == "Electric Slideshow Internal Player" }) {
+                    if let internalDevice = devices.first(where: { $0.name == internalDeviceName }) {
                         deviceId = internalDevice.deviceId
                         isReady = true
+                        if !hasNotifiedReady {
+                            hasNotifiedReady = true
+                            onReady?()
+                        }
                         print("[SpotifyInternalPlaybackBackend] Detected internal player device on attempt \(attempt): id=\(internalDevice.deviceId), type=\(internalDevice.type), active=\(internalDevice.is_active), volume=\(internalDevice.volume_percent ?? 0)%")
                         PlayerInitLogger.shared.log(
                             "Detected internal player device on attempt \(attempt): id=\(internalDevice.deviceId), type=\(internalDevice.type), active=\(internalDevice.is_active), volume=\(internalDevice.volume_percent ?? 0)%",

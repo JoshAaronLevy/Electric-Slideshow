@@ -13,7 +13,7 @@ struct Electric_SlideshowApp: App {
     @StateObject private var spotifyAuthService = SpotifyAuthService.shared
     @StateObject private var playlistsStore = PlaylistsStore()
     @StateObject private var nowPlayingStore = NowPlayingStore()
-    @StateObject private var internalPlayerManager = InternalPlayerManager()
+    @StateObject private var internalPlayerManager = InternalPlayerManager.shared
     
     @Environment(\.scenePhase) private var scenePhase
     
@@ -44,7 +44,7 @@ struct Electric_SlideshowApp: App {
                     if newPhase == .background {
                         // Stop internal player when app goes to background or quits
                         print("[App] Scene phase changed to background, stopping internal player")
-                        internalPlayerManager.stop()
+                        internalPlayerManager.stopInternalPlayer()
                     }
                 }
         }
