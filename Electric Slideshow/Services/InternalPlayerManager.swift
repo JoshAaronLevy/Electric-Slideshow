@@ -43,7 +43,7 @@ final class InternalPlayerManager: ObservableObject {
     
     /// TODO: Edit this to point to your local electric-slideshow-internal-player repo
     /// Example: "/Users/yourname/Projects/electric-slideshow-internal-player"
-    static let defaultDevRepoPath = "/CHANGE/ME/absolute/path/to/electric-slideshow-internal-player"
+    static let defaultDevRepoPath = "/Users/joshlevy/Desktop/electric-slideshow-internal-player"
     
     // MARK: - Published State
     

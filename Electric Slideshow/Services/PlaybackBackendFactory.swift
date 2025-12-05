@@ -18,9 +18,6 @@ enum PlaybackBackendMode {
 }
 
 struct PlaybackBackendFactory {
-
-    /// Global default mode for the app. Keep this `.externalDevice`
-    /// until the internal player is fully implemented and tested.
     static let defaultMode: PlaybackBackendMode = .internalWebPlayer
 
     /// Cached internal backend so we can reuse the same instance.
@@ -29,13 +26,6 @@ struct PlaybackBackendFactory {
     /// Shared InternalPlayerManager instance
     private static var sharedPlayerManager: InternalPlayerManager?
 
-    /// Creates a music playback backend for the given mode.
-    ///
-    /// - Parameters:
-    ///   - mode: Which backend mode to use. Defaults to `defaultMode`.
-    ///   - spotifyAPIService: Your existing SpotifyAPIService instance.
-    ///   - spotifyAuthService: Your existing SpotifyAuthService instance.
-    /// - Returns: A `MusicPlaybackBackend` or `nil` if it cannot be created.
     static func makeBackend(
         mode: PlaybackBackendMode = defaultMode,
         spotifyAPIService: SpotifyAPIService?,
@@ -48,7 +38,6 @@ struct PlaybackBackendFactory {
 
         switch mode {
         case .externalDevice:
-            // Existing behavior: control a Spotify device via Web API.
             return SpotifyExternalPlaybackBackend(apiService: apiService)
 
         case .internalWebPlayer:

@@ -82,6 +82,8 @@ struct AppShellView: View {
 
     /// Initializes the internal web player early so it is ready when a slideshow starts.
     private func prewarmInternalPlayerIfNeeded() {
+        // Only prewarm when the internal player is the selected backend.
+        guard PlaybackBackendFactory.defaultMode == .internalWebPlayer else { return }
         guard spotifyAuthService.isAuthenticated else { return }
         guard prewarmedPlaybackBackend == nil else { return }
         prewarmedPlaybackBackend = PlaybackBackendFactory.prewarmInternalBackend(spotifyAPIService: spotifyAPIService)

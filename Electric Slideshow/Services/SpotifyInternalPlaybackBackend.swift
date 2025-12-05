@@ -176,11 +176,13 @@ final class SpotifyInternalPlaybackBackend: MusicPlaybackBackend {
     private func startDevicePoll() {
         guard !isPollingDevice else { return }
         isPollingDevice = true
+        
+        let maxAttempts = 30
 
         Task {
             defer { isPollingDevice = false }
 
-            for attempt in 1...10 {
+            for attempt in 1...maxAttempts {
                 do {
                     let devices = try await apiService.fetchAvailableDevices()
                     if let internalDevice = devices.first(where: { $0.name == "Electric Slideshow Internal Player" }) {
@@ -189,6 +191,10 @@ final class SpotifyInternalPlaybackBackend: MusicPlaybackBackend {
                         print("[SpotifyInternalPlaybackBackend] Detected internal player device on attempt \(attempt): \(internalDevice.deviceId)")
                         return
                     }
+                    
+                    if attempt == 1 || attempt % 5 == 0 {
+                        print("[SpotifyInternalPlaybackBackend] Internal player not in device list yet (attempt \(attempt)/\(maxAttempts))")
+                    }
                 } catch {
                     print("[SpotifyInternalPlaybackBackend] Device poll failed (attempt \(attempt)): \(error.localizedDescription)")
                 }
@@ -196,7 +202,7 @@ final class SpotifyInternalPlaybackBackend: MusicPlaybackBackend {
                 try? await Task.sleep(nanoseconds: 1_000_000_000) // 1s between attempts
             }
 
-            print("[SpotifyInternalPlaybackBackend] Device poll: internal player not found after 10 attempts")
+            print("[SpotifyInternalPlaybackBackend] Device poll: internal player not found after \(maxAttempts) attempts")
             onError?(.backend(message: "Internal player device not detected. Make sure the Electron process is running."))
         }
     }
