@@ -2,7 +2,9 @@ import SwiftUI
 
 struct SettingsDashboardView: View {
     @State private var showingDevicesSheet = false
+    @State private var showingInternalPlayerSheet = false
     @ObservedObject private var devicesViewModel: SpotifyDevicesViewModel  // ← changed
+    @EnvironmentObject private var internalPlayerManager: InternalPlayerManager
 
     init(devicesViewModel: SpotifyDevicesViewModel) {
         self.devicesViewModel = devicesViewModel
@@ -14,6 +16,12 @@ struct SettingsDashboardView: View {
             subtitle: "View Available Spotify Connected Devices",
             icon: "hifispeaker.and.homepod",
             action: .playbackDevices
+        ),
+        SettingsTile(
+            title: "Internal Player (Dev)",
+            subtitle: "Launch Electron Internal Player for Testing",
+            icon: "play.circle.fill",
+            action: .internalPlayer
         )
     ]
 
@@ -47,6 +55,10 @@ struct SettingsDashboardView: View {
             .sheet(isPresented: $showingDevicesSheet) {
                 SpotifyDevicesSheetView(viewModel: devicesViewModel)
             }
+            .sheet(isPresented: $showingInternalPlayerSheet) {
+                InternalPlayerDebugSheet()
+                    .environmentObject(internalPlayerManager)
+            }
         }
     }
 
@@ -56,6 +68,9 @@ struct SettingsDashboardView: View {
         case .playbackDevices:
             print("[SettingsDashboardView] Setting showingDevicesSheet = true")
             showingDevicesSheet = true
+        case .internalPlayer:
+            print("[SettingsDashboardView] Setting showingInternalPlayerSheet = true")
+            showingInternalPlayerSheet = true
         }
     }
 }
@@ -63,6 +78,7 @@ struct SettingsDashboardView: View {
 struct SettingsTile: Identifiable {
     enum Action {
         case playbackDevices
+        case internalPlayer
         // Add more actions here
     }
     let id = UUID()
@@ -160,18 +176,148 @@ private struct SpotifyDevicesSheet: View {
                     .pointingHandCursor()
                 }
             }
-        }
-        .onAppear {
-            Task {
-                do {
-                    isLoading = true
-                    devices = try await apiService.fetchAvailableDevices()
-                    isLoading = false
-                } catch {
-                    print("[SpotifyDevicesSheet] Device fetch error: \(error)")
-                    self.error = error.localizedDescription
-                    isLoading = false
+            .onAppear {
+                Task {
+                    do {
+                        isLoading = true
+                        devices = try await apiService.fetchAvailableDevices()
+                        isLoading = false
+                    } catch {
+                        print("[SpotifyDevicesSheet] Device fetch error: \(error)")
+                        self.error = error.localizedDescription
+                        isLoading = false
+                    }
                 }
+            }
+        }
+    }
+}
+
+// MARK: - Internal Player Debug Sheet
+
+struct InternalPlayerDebugSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var internalPlayerManager: InternalPlayerManager
+    @EnvironmentObject private var spotifyAuthService: SpotifyAuthService
+    @State private var isStarting = false
+    @State private var errorMessage: String?
+    
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 24) {
+                // Status Section
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Status")
+                        .font(.headline)
+                    HStack {
+                        Circle()
+                            .fill(internalPlayerManager.isRunning ? Color.green : Color.gray)
+                            .frame(width: 12, height: 12)
+                        Text(internalPlayerManager.isRunning ? "Running" : "Not Running")
+                            .font(.body)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+                .background(Color(nsColor: .controlBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                
+                // Error Message
+                if let error = errorMessage ?? internalPlayerManager.lastError {
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.orange.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                
+                // Controls
+                VStack(spacing: 12) {
+                    Button {
+                        startInternalPlayer()
+                    } label: {
+                        HStack {
+                            if isStarting {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "play.circle.fill")
+                            }
+                            Text("Start Internal Player")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(internalPlayerManager.isRunning || isStarting)
+                    
+                    Button {
+                        internalPlayerManager.stop()
+                        errorMessage = nil
+                    } label: {
+                        HStack {
+                            Image(systemName: "stop.circle.fill")
+                            Text("Stop Internal Player")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!internalPlayerManager.isRunning)
+                }
+                
+                // Info Section
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("About")
+                        .font(.headline)
+                    Text("This launches the Electron-based internal player from your local development repository. Make sure you've run `npm install` in the electric-slideshow-internal-player directory first.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+                .background(Color(nsColor: .controlBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                
+                Spacer()
+            }
+            .padding()
+            .navigationTitle("Internal Player Debug")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .frame(minWidth: 500, minHeight: 400)
+    }
+    
+    private func startInternalPlayer() {
+        isStarting = true
+        errorMessage = nil
+        
+        Task {
+            do {
+                // Get valid access token
+                let token = try await spotifyAuthService.getValidAccessToken()
+                
+                // Start the internal player
+                try internalPlayerManager.start(withAccessToken: token)
+                
+                isStarting = false
+            } catch {
+                errorMessage = "Failed to start: \(error.localizedDescription)"
+                isStarting = false
+                print("[InternalPlayerDebugSheet] Error starting player: \(error)")
             }
         }
     }

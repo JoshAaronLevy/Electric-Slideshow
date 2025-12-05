@@ -13,6 +13,9 @@ struct Electric_SlideshowApp: App {
     @StateObject private var spotifyAuthService = SpotifyAuthService.shared
     @StateObject private var playlistsStore = PlaylistsStore()
     @StateObject private var nowPlayingStore = NowPlayingStore()
+    @StateObject private var internalPlayerManager = InternalPlayerManager()
+    
+    @Environment(\.scenePhase) private var scenePhase
     
     var body: some Scene {
         Window("Electric Slideshow", id: "mainWindow") {
@@ -21,6 +24,7 @@ struct Electric_SlideshowApp: App {
                 .environmentObject(spotifyAuthService)
                 .environmentObject(playlistsStore)
                 .environmentObject(nowPlayingStore)
+                .environmentObject(internalPlayerManager)
                 .onOpenURL { url in
                     print("[App] ===== onOpenURL CALLED =====")
                     print("[App] URL: \(url.absoluteString)")
@@ -34,6 +38,13 @@ struct Electric_SlideshowApp: App {
                         }
                     } else {
                         print("[App] Scheme does not match com.electricslideshow")
+                    }
+                }
+                .onChange(of: scenePhase) { oldPhase, newPhase in
+                    if newPhase == .background {
+                        // Stop internal player when app goes to background or quits
+                        print("[App] Scene phase changed to background, stopping internal player")
+                        internalPlayerManager.stop()
                     }
                 }
         }
