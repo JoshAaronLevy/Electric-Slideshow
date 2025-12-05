@@ -95,6 +95,10 @@ final class SpotifyAuthService: ObservableObject {
     func getValidAccessToken() async throws -> String {
         guard let token = try KeychainService.shared.retrieve(SpotifyAuthToken.self, forKey: keychainKey) else {
             print("[SpotifyAuth] ERROR: No token found in keychain - throwing notAuthenticated")
+            PlayerInitLogger.shared.log(
+                "ERROR: No token found in keychain - throwing notAuthenticated",
+                source: "SpotifyAuth"
+            )
             throw SpotifyAuthError.notAuthenticated
         }
         
@@ -107,6 +111,10 @@ final class SpotifyAuthService: ObservableObject {
             // Check if a refresh is already in progress
             if let existingTask = refreshTask {
                 print("[SpotifyAuth] Refresh already in progress, waiting for existing task...")
+                PlayerInitLogger.shared.log(
+                    "Refresh already in progress, waiting for existing task...",
+                    source: "SpotifyAuth"
+                )
                 return try await existingTask.value
             }
             
@@ -116,6 +124,10 @@ final class SpotifyAuthService: ObservableObject {
                     print("[SpotifyAuth] Clearing refresh task")
                     self.refreshTask = nil
                 }
+                PlayerInitLogger.shared.log(
+                    "Token expired, refreshing access token",
+                    source: "SpotifyAuth"
+                )
                 return try await self.refreshAccessToken(refreshToken: token.refreshToken)
             }
             
@@ -124,6 +136,11 @@ final class SpotifyAuthService: ObservableObject {
         }
         
         print("[SpotifyAuth] Token \(token.accessToken)")
+        let tokenPrefix = String(token.accessToken.prefix(8))
+        PlayerInitLogger.shared.log(
+            "Valid token retrieved (prefix: \(tokenPrefix)...)",
+            source: "SpotifyAuth"
+        )
         return token.accessToken
     }
     
@@ -144,9 +161,17 @@ final class SpotifyAuthService: ObservableObject {
             let token = try KeychainService.shared.retrieve(SpotifyAuthToken.self, forKey: keychainKey)
             isAuthenticated = token != nil
             print("[SpotifyAuth] Checked auth status in init: \(isAuthenticated ? "authenticated (token found)" : "not authenticated (no token)")")
+            PlayerInitLogger.shared.log(
+                "Checked auth status in init: \(isAuthenticated ? "authenticated (token found)" : "not authenticated (no token)")",
+                source: "SpotifyAuth"
+            )
         } catch {
             isAuthenticated = false
             print("[SpotifyAuth] Checked auth status in init: not authenticated (error: \(error))")
+            PlayerInitLogger.shared.log(
+                "Checked auth status in init: not authenticated (error: \(error))",
+                source: "SpotifyAuth"
+            )
         }
     }
     
@@ -247,24 +272,66 @@ final class SpotifyAuthService: ObservableObject {
             throw SpotifyAuthError.serverError
         }
         
-        let newToken = try JSONDecoder().decode(SpotifyAuthToken.self, from: data)
-        print("[SpotifyAuth] New token received with scopes: '\(newToken.scope)'")
-        print("[SpotifyAuth] New token expires in: \(newToken.expiresIn) seconds")
+        // Decode the token response
+        let decodedToken: SpotifyAuthToken
+        do {
+            decodedToken = try JSONDecoder().decode(SpotifyAuthToken.self, from: data)
+        } catch {
+            print("[SpotifyAuth] ERROR: Failed to decode token response")
+            print("[SpotifyAuth] ERROR: Decoding error: \(error)")
+            if let decodingError = error as? DecodingError {
+                switch decodingError {
+                case .keyNotFound(let key, let context):
+                    print("[SpotifyAuth] ERROR: Missing key '\(key.stringValue)' - \(context.debugDescription)")
+                case .typeMismatch(let type, let context):
+                    print("[SpotifyAuth] ERROR: Type mismatch for type '\(type)' - \(context.debugDescription)")
+                case .valueNotFound(let type, let context):
+                    print("[SpotifyAuth] ERROR: Value not found for type '\(type)' - \(context.debugDescription)")
+                case .dataCorrupted(let context):
+                    print("[SpotifyAuth] ERROR: Data corrupted - \(context.debugDescription)")
+                @unknown default:
+                    print("[SpotifyAuth] ERROR: Unknown decoding error")
+                }
+            }
+            let responseString = String(data: data, encoding: .utf8) ?? "(unable to decode response)"
+            print("[SpotifyAuth] ERROR: Response body: \(responseString)")
+            throw error
+        }
+        
+        print("[SpotifyAuth] New token received with scopes: '\(decodedToken.scope)'")
+        print("[SpotifyAuth] New token expires in: \(decodedToken.expiresIn) seconds")
+        
+        // Spotify's token refresh endpoint doesn't return a new refresh token.
+        // The existing refresh token remains valid and should be preserved.
+        let tokenToSave: SpotifyAuthToken
+        if decodedToken.refreshToken.isEmpty {
+            print("[SpotifyAuth] Refresh token not included in response - preserving original refresh token")
+            tokenToSave = SpotifyAuthToken(
+                accessToken: decodedToken.accessToken,
+                refreshToken: refreshToken, // Use the original refresh token passed to this function
+                expiresIn: decodedToken.expiresIn,
+                tokenType: decodedToken.tokenType,
+                scope: decodedToken.scope,
+                issuedAt: decodedToken.issuedAt
+            )
+        } else {
+            tokenToSave = decodedToken
+        }
         
         // Check if scopes changed during refresh
         if let oldToken = try KeychainService.shared.retrieve(SpotifyAuthToken.self, forKey: keychainKey) {
-            if oldToken.scope != newToken.scope {
+            if oldToken.scope != tokenToSave.scope {
                 print("[SpotifyAuth] WARNING: Scopes changed during refresh!")
                 print("[SpotifyAuth] Old scopes: '\(oldToken.scope)'")
-                print("[SpotifyAuth] New scopes: '\(newToken.scope)'")
+                print("[SpotifyAuth] New scopes: '\(tokenToSave.scope)'")
             }
         }
         
-        try KeychainService.shared.save(newToken, forKey: keychainKey)
+        try KeychainService.shared.save(tokenToSave, forKey: keychainKey)
         print("[SpotifyAuth] Token refreshed and saved successfully")
         print("[SpotifyAuth] ===== TOKEN REFRESH COMPLETED =====")
         
-        return newToken.accessToken
+        return tokenToSave.accessToken
     }
 }
 

@@ -70,8 +70,19 @@ struct PlaybackBackendFactory {
         guard let apiService = spotifyAPIService else { return nil }
         
         if let cached = sharedInternalBackend {
+            print("[PlaybackBackendFactory] Reusing cached internal backend instance")
+            PlayerInitLogger.shared.log(
+                "Reusing cached internal backend instance",
+                source: "PlaybackBackendFactory"
+            )
             return cached
         }
+        
+        print("[PlaybackBackendFactory] Creating new internal backend instance")
+        PlayerInitLogger.shared.log(
+            "Creating new internal backend instance",
+            source: "PlaybackBackendFactory"
+        )
         
         // Create or reuse the player manager
         let playerManager = sharedPlayerManager ?? InternalPlayerManager()

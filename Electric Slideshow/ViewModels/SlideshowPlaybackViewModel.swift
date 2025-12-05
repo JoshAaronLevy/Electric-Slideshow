@@ -30,8 +30,19 @@ final class SlideshowPlaybackViewModel: ObservableObject {
     private var playbackIndices: [Int] = []
     private var musicClipMode: MusicClipMode = .seconds60
     private var lastClipAppliedTrackUri: String?
-    private let minClipWindowMs = 500
+    private let minCustomClipWindowMs = 3000
+    private let minSafeClipSeconds: Double = 1.0
+    private let playbackStartToleranceMs = 750
     private let musicBackend: MusicPlaybackBackend?
+
+    private var backendDescription: String {
+        guard let backend = musicBackend else { return "none" }
+        return backend.requiresExternalApp ? "external" : "internal"
+    }
+
+    private var currentTrackUri: String? {
+        normalizedPlaybackState.trackUri ?? currentPlaybackState?.item?.uri
+    }
     
     var currentImage: NSImage? {
         guard currentIndex < loadedImages.count else { return nil }
@@ -141,8 +152,10 @@ final class SlideshowPlaybackViewModel: ObservableObject {
     }
 
     /// Starts the clip timer for the given duration (in seconds).
-    private func startMusicClipTimer(duration: TimeInterval) {
+    private func startMusicClipTimer(duration: TimeInterval, reason: String = "clipWindow") {
         stopMusicClipTimer()
+        let trackLabel = currentTrackUri ?? "unknown"
+        print("[SlideshowPlaybackViewModel] Starting clip timer for track=\(trackLabel) backend=\(backendDescription) duration=\(String(format: "%.2f", duration))s reason=\(reason)")
 
         musicClipTimer = Timer.scheduledTimer(
             withTimeInterval: duration,
@@ -150,10 +163,10 @@ final class SlideshowPlaybackViewModel: ObservableObject {
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self else { return }
+                let firedTrackLabel = self.currentTrackUri ?? "unknown"
+                print("[SlideshowPlaybackViewModel] Clip timer fired for track=\(firedTrackLabel) backend=\(self.backendDescription)")
                 // After the clip window ends, move to the next track
-                await self.skipToNextTrack()
-                // And arm the timer again for the next track
-                self.resetMusicClipTimerForCurrentTrack()
+                await self.skipToNextTrack(fromClipTimer: true)
             }
         }
     }
@@ -525,14 +538,16 @@ final class SlideshowPlaybackViewModel: ObservableObject {
         playbackCheckTimer = nil
     }
     
-    private func checkPlaybackState() async {
+    private func checkPlaybackState(shouldRearmOnTrackChange: Bool = true) async {
         guard let apiService = spotifyAPIService else { return }
         
         do {
             let state = try await apiService.getCurrentPlaybackState()
             currentPlaybackState = state
             updateNormalizedPlaybackState(from: state)
-            if let uri = state?.item?.uri, uri != lastClipAppliedTrackUri {
+            if shouldRearmOnTrackChange,
+               let uri = state?.item?.uri,
+               uri != lastClipAppliedTrackUri {
                 resetMusicClipTimerForCurrentTrack()
             }
         } catch {
@@ -581,15 +596,37 @@ final class SlideshowPlaybackViewModel: ObservableObject {
 
             let uri = item.uri
             let trackDuration = item.durationMs
+            let progressMs = playback.progressMs ?? 0
             let playlistTrack = playlist.playlistTracks.first { $0.uri == uri }
             let clipWindow = effectiveClipWindow(
                 track: playlistTrack,
                 playlist: playlist,
                 trackDurationMs: trackDuration
             )
+            let startMs = clipWindow.startMs ?? 0
+            let clipDurationMs = clipWindow.durationMs ?? trackDuration
+            let clipWindowSeconds = Double(clipDurationMs) / 1000.0
+            let hasReachedStart = progressMs >= max(startMs - playbackStartToleranceMs, 0)
+            let playbackReady = playback.isPlaying || (hasReachedStart && progressMs > 0)
+
+            guard trackDuration > 0 else {
+                print("[SlideshowPlaybackViewModel] Clip not armed: invalid track duration (\(trackDuration)) for track=\(uri) backend=\(backendDescription)")
+                return
+            }
+
+            guard playbackReady else {
+                print("[SlideshowPlaybackViewModel] Deferring clip arming: playback not ready track=\(uri) backend=\(backendDescription) isPlaying=\(playback.isPlaying) progressMs=\(progressMs) startMs=\(startMs) hasReachedStart=\(hasReachedStart)")
+                return
+            }
+
+            guard clipWindowSeconds >= minSafeClipSeconds else {
+                print("[SlideshowPlaybackViewModel] Clip not armed: tiny/invalid window (\(String(format: "%.2f", clipWindowSeconds))s) track=\(uri) backend=\(backendDescription) trackDurationMs=\(trackDuration) clipDurationMs=\(clipDurationMs) startMs=\(startMs) -> playing without enforced clip")
+                lastClipAppliedTrackUri = uri
+                return
+            }
 
             // Seek to the clip start if needed
-            if let startMs = clipWindow.startMs, startMs > 0 {
+            if startMs > 0 {
                 if let backend = musicBackend, backend.isReady {
                     backend.seek(to: startMs)
                 } else {
@@ -598,9 +635,7 @@ final class SlideshowPlaybackViewModel: ObservableObject {
             }
 
             // Arm timer for clip duration
-            if let durationMs = clipWindow.durationMs {
-                startMusicClipTimer(duration: Double(durationMs) / 1000.0)
-            }
+            startMusicClipTimer(duration: clipWindowSeconds, reason: "clipWindow")
 
             lastClipAppliedTrackUri = uri
         } catch {
@@ -617,15 +652,42 @@ final class SlideshowPlaybackViewModel: ObservableObject {
         let durationMsPreferred = trackDurationMs ?? track?.durationMs
 
         // Custom clip
-        if let track, track.clipMode == .custom {
-            let start = max(0, track.customStartMs ?? 0)
-            let endRaw = track.customEndMs ?? (durationMsPreferred ?? start)
-            let clampedEnd = clamp(endRaw, to: durationMsPreferred, lowerBound: start + minClipWindowMs)
-            let duration = max(clampedEnd - start, minClipWindowMs)
-            return (start, duration)
+        if let track, track.clipMode == .custom,
+           let customWindow = customClipWindow(for: track, trackDurationMs: durationMsPreferred) {
+            return customWindow
         }
 
-        // Playlist default or global
+        return defaultClipWindow(playlist: playlist, trackDurationMs: durationMsPreferred)
+    }
+
+    private func customClipWindow(
+        for track: PlaylistTrack,
+        trackDurationMs: Int?
+    ) -> (startMs: Int, durationMs: Int)? {
+        let start = max(0, track.customStartMs ?? 0)
+        let rawEnd = track.customEndMs ?? (trackDurationMs ?? start)
+        let boundedEnd = trackDurationMs.map { min(rawEnd, $0) } ?? rawEnd
+        let duration = boundedEnd - start
+
+        guard duration >= minCustomClipWindowMs else {
+            return nil
+        }
+
+        if let durationMsPreferred = trackDurationMs {
+            let maxDuration = max(durationMsPreferred - start, 0)
+            guard maxDuration >= minCustomClipWindowMs else {
+                return nil
+            }
+            return (start, min(duration, maxDuration))
+        }
+
+        return (start, duration)
+    }
+
+    private func defaultClipWindow(
+        playlist: AppPlaylist,
+        trackDurationMs: Int?
+    ) -> (startMs: Int?, durationMs: Int?) {
         let mode = playlist.playlistDefaultClipMode ?? musicClipMode
         guard let clipSeconds = mode.clipDuration else {
             // Full song: no timer, play to natural end
@@ -636,25 +698,17 @@ final class SlideshowPlaybackViewModel: ObservableObject {
         let durationMs: Int
         let startMs: Int
 
-        if let duration = durationMsPreferred, duration > clipMs {
+        if let duration = trackDurationMs, duration > clipMs {
             // Random start within track if it can fit the clip window
             let maxStart = max(duration - clipMs, 0)
             startMs = maxStart > 0 ? Int.random(in: 0...maxStart) : 0
             durationMs = clipMs
         } else {
             startMs = 0
-            durationMs = durationMsPreferred.map { min($0, clipMs) } ?? clipMs
+            durationMs = trackDurationMs.map { min($0, clipMs) } ?? clipMs
         }
 
         return (startMs, durationMs)
-    }
-
-    private func clamp(_ value: Int, to upperBound: Int?, lowerBound: Int) -> Int {
-        if let upper = upperBound {
-            return min(max(value, lowerBound), upper)
-        } else {
-            return max(value, lowerBound)
-        }
     }
     
     // MARK: - Music Controls
@@ -693,7 +747,9 @@ final class SlideshowPlaybackViewModel: ObservableObject {
         }
     }
     
-    func skipToNextTrack() async {
+    func skipToNextTrack(fromClipTimer: Bool = false) async {
+        let trackLabel = currentTrackUri ?? "unknown"
+        print("[SlideshowPlaybackViewModel] skipToNextTrack fromClipTimer=\(fromClipTimer) backend=\(backendDescription) track=\(trackLabel)")
         if let backend = musicBackend {
             backend.nextTrack()
             // New track → restart the clip timer (if active)
@@ -705,7 +761,7 @@ final class SlideshowPlaybackViewModel: ObservableObject {
 
         do {
             try await apiService.skipToNext()
-            await checkPlaybackState()
+            await checkPlaybackState(shouldRearmOnTrackChange: false)
             // New track → restart the clip timer (if active)
             resetMusicClipTimerForCurrentTrack()
         } catch {
@@ -725,7 +781,7 @@ final class SlideshowPlaybackViewModel: ObservableObject {
 
         do {
             try await apiService.skipToPrevious()
-            await checkPlaybackState()
+            await checkPlaybackState(shouldRearmOnTrackChange: false)
             // New track → restart the clip timer (if active)
             resetMusicClipTimerForCurrentTrack()
         } catch {

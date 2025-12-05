@@ -123,10 +123,19 @@ final class InternalPlayerManager: ObservableObject {
               isDirectory.boolValue else {
             let error = InternalPlayerError.invalidPath(devRepoPath)
             lastError = error.localizedDescription
+            print("[InternalPlayerManager] ERROR: Invalid path: \(devRepoPath)")
+            PlayerInitLogger.shared.log(
+                "ERROR: Invalid path: \(devRepoPath)",
+                source: "InternalPlayerManager"
+            )
             throw error
         }
         
         print("[InternalPlayerManager] Starting internal player in dev mode at \(repoURL.path)")
+        PlayerInitLogger.shared.log(
+            "Starting internal player in dev mode at \(repoURL.path)",
+            source: "InternalPlayerManager"
+        )
         
         // Create process
         let newProcess = Process()
@@ -138,12 +147,21 @@ final class InternalPlayerManager: ObservableObject {
         var environment = ProcessInfo.processInfo.environment
         environment["SPOTIFY_ACCESS_TOKEN"] = token
         environment["ELECTRIC_SLIDESHOW_MODE"] = "internal-player"
+        print("[InternalPlayerManager] Setting environment variables: SPOTIFY_ACCESS_TOKEN, ELECTRIC_SLIDESHOW_MODE")
+        PlayerInitLogger.shared.log(
+            "Setting environment variables: SPOTIFY_ACCESS_TOKEN, ELECTRIC_SLIDESHOW_MODE",
+            source: "InternalPlayerManager"
+        )
         newProcess.environment = environment
         
         // Set up termination handler
         newProcess.terminationHandler = { [weak self] process in
             Task { @MainActor in
                 print("[InternalPlayerManager] Process terminated with status: \(process.terminationStatus)")
+                PlayerInitLogger.shared.log(
+                    "Process terminated with status: \(process.terminationStatus)",
+                    source: "InternalPlayerManager"
+                )
                 self?.process = nil
                 self?.isRunning = false
             }
@@ -155,10 +173,19 @@ final class InternalPlayerManager: ObservableObject {
             self.process = newProcess
             self.isRunning = true
             print("[InternalPlayerManager] Process launched with PID \(newProcess.processIdentifier)")
+            PlayerInitLogger.shared.log(
+                "Process launched with PID \(newProcess.processIdentifier)",
+                source: "InternalPlayerManager"
+            )
             lastError = nil
         } catch {
             let playerError = InternalPlayerError.processLaunchFailed(error.localizedDescription)
             lastError = playerError.localizedDescription
+            print("[InternalPlayerManager] ERROR: Process launch failed: \(error.localizedDescription)")
+            PlayerInitLogger.shared.log(
+                "ERROR: Process launch failed: \(error.localizedDescription)",
+                source: "InternalPlayerManager"
+            )
             throw playerError
         }
     }

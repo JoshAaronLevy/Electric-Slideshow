@@ -17,6 +17,11 @@ struct AppShellView: View {
     @State private var showingSpotifyReauthAlert = false
     @State private var spotifyReauthMessage: String?
     @State private var prewarmedPlaybackBackend: MusicPlaybackBackend?
+    
+    // Player initialization error alert
+    @State private var showingPlayerInitError = false
+    @State private var playerInitErrorMessage: String = ""
+    @State private var playerInitLogs: String = ""
 
     init(photoService: PhotoLibraryService) {
         _permissionVM = StateObject(wrappedValue: PermissionViewModel(photoService: photoService))
@@ -76,6 +81,17 @@ struct AppShellView: View {
         } message: {
             Text(spotifyReauthMessage ?? "Your Spotify account is not connected. Would you like to connect now?")
         }
+        .alert("Spotify Player Initialization Failed", isPresented: $showingPlayerInitError) {
+            Button("Dismiss", role: .cancel) {
+                PlayerInitLogger.shared.clearLogs()
+            }
+            .pointingHandCursor()
+        } message: {
+            PlayerInitErrorAlertContent(
+                errorMessage: playerInitErrorMessage,
+                logs: playerInitLogs
+            )
+        }
     }
 
     // MARK: - Spotify Connection Validation
@@ -83,10 +99,72 @@ struct AppShellView: View {
     /// Initializes the internal web player early so it is ready when a slideshow starts.
     private func prewarmInternalPlayerIfNeeded() {
         // Only prewarm when the internal player is the selected backend.
-        guard PlaybackBackendFactory.defaultMode == .internalWebPlayer else { return }
-        guard spotifyAuthService.isAuthenticated else { return }
-        guard prewarmedPlaybackBackend == nil else { return }
-        prewarmedPlaybackBackend = PlaybackBackendFactory.prewarmInternalBackend(spotifyAPIService: spotifyAPIService)
+        guard PlaybackBackendFactory.defaultMode == .internalWebPlayer else {
+            print("[AppShellView] Skipping player pre-warm: Backend mode is not internal web player")
+            PlayerInitLogger.shared.log(
+                "Skipping player pre-warm: Backend mode is not internal web player",
+                source: "AppShellView"
+            )
+            return
+        }
+        guard spotifyAuthService.isAuthenticated else {
+            print("[AppShellView] Skipping player pre-warm: User is not authenticated")
+            PlayerInitLogger.shared.log(
+                "Skipping player pre-warm: User is not authenticated",
+                source: "AppShellView"
+            )
+            return
+        }
+        guard prewarmedPlaybackBackend == nil else {
+            print("[AppShellView] Skipping player pre-warm: Backend already prewarmed")
+            PlayerInitLogger.shared.log(
+                "Skipping player pre-warm: Backend already prewarmed",
+                source: "AppShellView"
+            )
+            return
+        }
+        print("[AppShellView] Triggering internal player pre-warm")
+        PlayerInitLogger.shared.log(
+            "Triggering internal player pre-warm",
+            source: "AppShellView"
+        )
+        
+        // Clear previous logs before starting new initialization
+        PlayerInitLogger.shared.clearLogs()
+        
+        // Create backend and set up error callback
+        let backend = PlaybackBackendFactory.prewarmInternalBackend(spotifyAPIService: spotifyAPIService)
+        
+        // Wire up error callback to show alert with logs
+        if let internalBackend = backend as? SpotifyInternalPlaybackBackend {
+            internalBackend.onError = { error in
+                Task { @MainActor in
+                    self.handlePlayerInitError(error)
+                }
+            }
+        }
+        
+        prewarmedPlaybackBackend = backend
+    }
+    
+    private func handlePlayerInitError(_ error: PlaybackError) {
+        let errorMessage: String
+        switch error {
+        case .backend(let message):
+            errorMessage = message
+        case .notReady:
+            errorMessage = "Player not ready"
+        case .unauthorized:
+            errorMessage = "Spotify authorization failed"
+        case .network:
+            errorMessage = "Network error while initializing player"
+        }
+        
+        playerInitErrorMessage = errorMessage
+        playerInitLogs = PlayerInitLogger.shared.formattedLogs()
+        showingPlayerInitError = true
+        
+        print("[AppShellView] Player initialization failed: \(errorMessage)")
     }
 
     private func validateSpotifyConnectionOnLaunch() async {
@@ -426,4 +504,35 @@ private struct PermissionDeniedView: View {
 #Preview("Granted") {
     let service = PhotoLibraryService()
     AppShellView(photoService: service)
+}
+
+// MARK: - Player Init Error Alert Content
+
+/// Custom view for displaying player initialization error with logs
+private struct PlayerInitErrorAlertContent: View {
+    let errorMessage: String
+    let logs: String
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Error: \(errorMessage)")
+                .font(.body)
+            
+            Text("Initialization Logs:")
+                .font(.headline)
+                .padding(.top, 8)
+            
+            ScrollView {
+                Text(logs)
+                    .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(8)
+                    .background(Color(nsColor: .textBackgroundColor))
+                    .cornerRadius(4)
+            }
+            .frame(maxHeight: 200)
+        }
+        .frame(maxWidth: 500)
+    }
 }

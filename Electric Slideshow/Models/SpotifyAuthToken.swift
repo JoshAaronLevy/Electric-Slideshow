@@ -24,10 +24,24 @@ struct SpotifyAuthToken: Codable {
         case issuedAt
     }
     
+    // Memberwise initializer for creating tokens programmatically
+    init(accessToken: String, refreshToken: String, expiresIn: Int, tokenType: String, scope: String, issuedAt: Date) {
+        self.accessToken = accessToken
+        self.refreshToken = refreshToken
+        self.expiresIn = expiresIn
+        self.tokenType = tokenType
+        self.scope = scope
+        self.issuedAt = issuedAt
+    }
+    
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         accessToken = try container.decode(String.self, forKey: .accessToken)
-        refreshToken = try container.decode(String.self, forKey: .refreshToken)
+        // refreshToken is optional during decoding because Spotify's token refresh endpoint
+        // doesn't return a new refresh token (the existing one remains valid).
+        // If missing, we use an empty string as a placeholder - the service layer will
+        // preserve the original refresh token when saving.
+        refreshToken = try container.decodeIfPresent(String.self, forKey: .refreshToken) ?? ""
         expiresIn = try container.decode(Int.self, forKey: .expiresIn)
         tokenType = try container.decode(String.self, forKey: .tokenType)
         scope = try container.decode(String.self, forKey: .scope)

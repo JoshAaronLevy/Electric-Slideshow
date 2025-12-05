@@ -34,6 +34,10 @@ final class SpotifyInternalPlaybackBackend: MusicPlaybackBackend {
 
     func initialize() {
         print("[SpotifyInternalPlaybackBackend] Initializing - starting Electron player process")
+        PlayerInitLogger.shared.log(
+            "Initializing - starting Electron player process",
+            source: "SpotifyInternalPlaybackBackend"
+        )
         
         Task { @MainActor in
             do {
@@ -44,12 +48,20 @@ final class SpotifyInternalPlaybackBackend: MusicPlaybackBackend {
                 try playerManager.start(withAccessToken: token)
                 
                 print("[SpotifyInternalPlaybackBackend] Electron process started, polling for device")
+                PlayerInitLogger.shared.log(
+                    "Electron process started, polling for device",
+                    source: "SpotifyInternalPlaybackBackend"
+                )
                 
                 // Poll for the device to appear in Spotify's device list
                 startDevicePoll()
             } catch {
                 let message = "Failed to start internal player: \(error.localizedDescription)"
                 print("[SpotifyInternalPlaybackBackend] \(message)")
+                PlayerInitLogger.shared.log(
+                    message,
+                    source: "SpotifyInternalPlaybackBackend"
+                )
                 onError?(.backend(message: message))
             }
         }
@@ -188,21 +200,37 @@ final class SpotifyInternalPlaybackBackend: MusicPlaybackBackend {
                     if let internalDevice = devices.first(where: { $0.name == "Electric Slideshow Internal Player" }) {
                         deviceId = internalDevice.deviceId
                         isReady = true
-                        print("[SpotifyInternalPlaybackBackend] Detected internal player device on attempt \(attempt): \(internalDevice.deviceId)")
+                        print("[SpotifyInternalPlaybackBackend] Detected internal player device on attempt \(attempt): id=\(internalDevice.deviceId), type=\(internalDevice.type), active=\(internalDevice.is_active), volume=\(internalDevice.volume_percent ?? 0)%")
+                        PlayerInitLogger.shared.log(
+                            "Detected internal player device on attempt \(attempt): id=\(internalDevice.deviceId), type=\(internalDevice.type), active=\(internalDevice.is_active), volume=\(internalDevice.volume_percent ?? 0)%",
+                            source: "SpotifyInternalPlaybackBackend"
+                        )
                         return
                     }
                     
                     if attempt == 1 || attempt % 5 == 0 {
                         print("[SpotifyInternalPlaybackBackend] Internal player not in device list yet (attempt \(attempt)/\(maxAttempts))")
+                        PlayerInitLogger.shared.log(
+                            "Internal player not in device list yet (attempt \(attempt)/\(maxAttempts))",
+                            source: "SpotifyInternalPlaybackBackend"
+                        )
                     }
                 } catch {
                     print("[SpotifyInternalPlaybackBackend] Device poll failed (attempt \(attempt)): \(error.localizedDescription)")
+                    PlayerInitLogger.shared.log(
+                        "Device poll failed (attempt \(attempt)): \(error.localizedDescription)",
+                        source: "SpotifyInternalPlaybackBackend"
+                    )
                 }
 
                 try? await Task.sleep(nanoseconds: 1_000_000_000) // 1s between attempts
             }
 
             print("[SpotifyInternalPlaybackBackend] Device poll: internal player not found after \(maxAttempts) attempts")
+            PlayerInitLogger.shared.log(
+                "Device poll: internal player not found after \(maxAttempts) attempts",
+                source: "SpotifyInternalPlaybackBackend"
+            )
             onError?(.backend(message: "Internal player device not detected. Make sure the Electron process is running."))
         }
     }
