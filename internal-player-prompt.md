@@ -1,328 +1,292 @@
-# Context & Problem
+## Context & Problem
 
-I have a macOS Swift/SwiftUI app called **Electric Slideshow** that syncs Apple Photos slideshows with Spotify playlists.
+This repo is the macOS Swift/SwiftUI app **Electric Slideshow**. It already has:
 
-I’ve now built a **separate Electron + React internal player app** called `electric-slideshow-internal-player`. That Electron app:
+- A Spotify auth flow and services (e.g. `SpotifyAuthService.getValidAccessToken()` or similar).
+- An **internal player integration** using a separate Electron app:
+  - A type like `InternalPlayerManager` (or similarly named) that launches the Electron internal player as a child `Process` and injects `SPOTIFY_ACCESS_TOKEN` into the environment.
+  - Some app-level lifecycle wiring so that the Electron process is stopped when the app quits.
+  - Potentially a UI hook (button/toggle) to start/stop the internal player.
 
-- Runs the **Spotify Web Playback SDK**.
-- Exposes a global JS API like:
-  ```ts
-  window.INTERNAL_PLAYER = {
-    setAccessToken(token: string): void;
-    getStatus(): InternalPlayerStatus;
-    // plus some basic status UI
-  };
-  ```
+Separately, there is a **Electron + React internal player repo** (`electric-slideshow-internal-player`) that:
 
-* Supports taking a Spotify access token from the environment via `SPOTIFY_ACCESS_TOKEN=<token>` when launched (Stage 4 in that repo), or via a manual UI / DevTools.
+- Runs the Spotify Web Playback SDK.
+- Supports `SPOTIFY_ACCESS_TOKEN` via `process.env` on startup.
+- Registers a Connect device like “Electric Slideshow Internal Player”.
 
-My goal now is to integrate this internal player with the **Swift macOS app** so that:
+I’ve already gone through staged work in both repos; now I want you to:
 
-1. When the user enables “internal player” mode (or some setting), the Swift app:
+1. **Verify that the Swift-side wiring is correct** (launch mode, paths, process env).
+2. **Ensure there’s a clean, obvious way to manually start/stop the internal player from the UI for testing.**
+3. **Generate a Markdown testing checklist** describing how I should exercise this locally end-to-end.
 
-   * Launches the Electron internal player as a separate **local process**.
-   * Injects the latest Spotify OAuth access token via environment variable `SPOTIFY_ACCESS_TOKEN`.
-2. The internal player then registers itself as a Spotify Connect device (via the Web Playback SDK) and plays audio internally.
-3. When the app quits or the user explicitly disables the internal player, Swift should **shut down** the Electron process cleanly.
-
-I do **not** want to rewrite the Swift app in Electron. The Electron app is a companion process whose only job is: “be the internal Spotify player.”
-
----
-
-## Tech Stack & Repo Layout
-
-* **Main app (this repo):**
-
-  * macOS app “Electric Slideshow”.
-  * Swift + SwiftUI.
-  * Already has Spotify auth and API services (e.g. `SpotifyAuthService`, `SpotifyAPIService`, etc.).
-  * Currently uses external playback devices; no internal player is running by default.
-
-* **Internal player (separate repo):**
-
-  * Name: `electric-slideshow-internal-player`.
-  * Electron + React + TypeScript, built with `electron-vite`.
-  * For development:
-
-    * I can run it with `npm run dev` inside that repo.
-  * Stage 4 in that repo added support for reading `SPOTIFY_ACCESS_TOKEN` from the environment and calling `INTERNAL_PLAYER.setAccessToken(token)` automatically on startup.
-
-* **Workspace:**
-
-  * In VS Code, I have all of these repos in a single workspace:
-
-    * `Electric-Slideshow` (Swift/macOS)
-    * `electric-slideshow-server` (Node backend, deployed to [https://electric-slideshow-server.onrender.com](https://electric-slideshow-server.onrender.com))
-    * `electric-slideshow-internal-player` (Electron internal player)
-
-For simplicity, you can assume that the Electron project lives at a sibling path relative to the Swift repo, something like:
-
-```text
-../electric-slideshow-internal-player
-```
-
-If we need to, we can later move this path into a config or user preference.
-
----
-
-## Desired Integration Behavior (Swift side)
-
-1. **Internal player manager in Swift**
-
-   I want a dedicated Swift type (e.g. `InternalPlayerManager`) that:
-
-   * Knows how to:
-
-     * Launch the Electron internal player as a `Process`.
-     * Pass `SPOTIFY_ACCESS_TOKEN` into that process’s environment.
-     * Track whether the player process is running.
-     * Shut down the process when no longer needed.
-
-   * Provides a simple, high-level API to the rest of the app, something like:
-
-     ```swift
-     protocol InternalPlayerControlling {
-         var isRunning: Bool { get }
-         func start(withAccessToken token: String) async throws
-         func stop() async
-     }
-     ```
-
-     Or similar—naming and exact API are flexible, but keep it simple and explicit.
-
-   * For now, I don’t need rich IPC back from Electron. Just:
-
-     * ability to launch with the correct token,
-     * and ability to stop it.
-
-2. **Connection to existing Spotify auth**
-
-   * We already have code that fetches and refreshes Spotify OAuth tokens (e.g. `SpotifyAuthService.getValidAccessToken()` or similar).
-   * I want the internal player to always get a **fresh, valid token** when it is started.
-   * For v1, if the token expires, it’s acceptable for me to manually restart the internal player. Automatic re-tokenization can come later.
-
-   So:
-
-   * There should be a clear “integration point” in the Swift app where:
-
-     * We obtain a valid access token from our existing auth flow.
-     * We call `internalPlayerManager.start(withAccessToken: token)`.
-
-3. **UI toggle / user control**
-
-   For now, I’d like a simple, non-fancy way for the user to:
-
-   * Enable or disable the internal player from within the app.
-   * See whether the internal player appears to be “running” (as far as the Swift process knows).
-
-   This could be:
-
-   * A toggle in a settings/preferences view, or
-   * A small section in a sidebar / status area, e.g.:
-
-     * “Internal Player: [Start] / [Stop]”
-     * Status label: “Not running” or “Running”.
-
-4. **App lifecycle**
-
-   * When the entire `Electric Slideshow` app quits, we must ensure the Electron internal player process is also terminated.
-   * This should be handled in a central, predictable place (e.g., the `App` struct or an app-level coordinator).
+I am *not* asking for new architecture. I want a sanity pass and a simple test harness, not a refactor.
 
 ---
 
 ## Do NOT Write Tests
 
-* **Do NOT** add any unit tests or UI tests as part of this work.
-* Focus on:
-
-  * Clean abstractions,
-  * Good naming,
-  * Logging,
-  * And straightforward integration.
-
-Tests can be added later after the flow is validated.
+- Do **not** add unit tests or UI tests.
+- Focus on:
+  - Code review-style validation.
+  - Minimal, explicit fixes or glue code.
+  - A very clear, human-friendly testing checklist.
 
 ---
 
-## Implementation Strategy & Stages (Swift side)
+## Tasks
 
-Please work in staged fashion, similar to what we did for the Electron repo.
+### Task 1 – Inspect & sanity-check the existing integration
 
-### Stage 0 – Swift Integration Plan (doc only)
+1. Find the internal player components:
+   - The internal-player manager type (`InternalPlayerManager`, `InternalPlayerService`, or similar).
+   - Any enum or struct that represents the launch mode (dev vs bundled).
+   - Where the `Process` is created and launched for the Electron app.
+   - Any app-level lifecycle integration (e.g., in the `@main` `App` struct or an app coordinator).
 
-First, generate a concise plan file, e.g. `INTERNAL_PLAYER_SWIFT_PLAN.md` in this repo, that answers:
+2. Check for these things explicitly and **fix them if needed** (with minimal changes):
 
-1. **Where in the Swift app** we will:
-
-   * Put the `InternalPlayerManager` (e.g. `Services/InternalPlayerManager.swift`).
-   * Hook into the app lifecycle to stop the player on quit.
-   * Add UI control (which view / feature is the best candidate to host internal player controls).
-
-2. **How we will launch the Electron process**:
-
-   * Use Swift `Process` to start `npm run dev` or a more direct Electron entry, with a configurable command.
-   * For now, it’s acceptable to hardcode a dev-only path to the Electron project (e.g. `../electric-slideshow-internal-player`) behind a single constant or configuration struct, with a comment that it should be made configurable later.
-   * How we will set the `SPOTIFY_ACCESS_TOKEN` env var for that process.
-
-3. **How we will get a valid Spotify token**:
-
-   * Reference the existing auth service (e.g., `SpotifyAuthService.getValidAccessToken()`).
-   * Decide where we call this to start the internal player.
-
-4. **What the user-visible controls will be**:
-
-   * Which view or feature gets a Start/Stop button or toggle.
-   * How we bind the UI to `InternalPlayerManager.isRunning`.
-
-For Stage 0: **do not modify any Swift code**, just write the plan file.
-
----
-
-### Stage 1 – Implement `InternalPlayerManager` (no UI yet)
-
-After the plan is written and I say “Please proceed with Stage 1”:
-
-* Create a new Swift type (class or actor, your choice) e.g. `InternalPlayerManager` in a reasonable location (e.g. `Electric_Slideshow/Services/InternalPlayerManager.swift` or similar).
-
-Responsibilities:
-
-1. **Process management**:
-
-   * Hold a reference to an optional `Process` representing the Electron internal player.
-
-   * Implement:
-
-     ```swift
-     var isRunning: Bool { get }
-
-     func start(withAccessToken token: String) async throws
-     func stop() async
-     ```
-
-   * Starting should:
-
-     * If a process is already running, either:
-
-       * no-op, or
-       * stop and restart — document the behavior.
-     * Configure a `Process` with:
-
-       * `executableURL` pointing to `/usr/bin/env`
-       * `arguments` such that we effectively run:
-
-         ```bash
-         SPOTIFY_ACCESS_TOKEN="<token>" npm run dev
-         ```
-
-         in the `../electric-slideshow-internal-player` directory.
-       * `environment` inherited from the current process, but with `SPOTIFY_ACCESS_TOKEN` added/overridden.
-       * `currentDirectoryURL` set to the internal player project directory.
-     * Launch the process and track it in a stored property.
-     * Log to console on start success/failure.
-
-   * Stopping should:
-
-     * Safely terminate the process if it exists and is still running (e.g. call `terminate()` and/or `interrupt()`).
-     * Clear the stored reference.
-     * Log to console.
-
-2. **Safety & debugability**:
-
-   * Use logging like:
-
-     ```swift
-     print("[InternalPlayerManager] Starting internal player with token: \(token.prefix(8))…")
-     print("[InternalPlayerManager] Process launched with PID \(process.processIdentifier)")
-     print("[InternalPlayerManager] Stopping internal player")
-     ```
-
-     (Never log the full token.)
-   * Handle obvious errors (e.g., missing directory) gracefully, with clear error messages.
-
-3. **App lifecycle hook (no UI yet)**:
-
-   * Wire the `InternalPlayerManager` into the app-level structure so that:
-
-     * On app termination, `stop()` is called.
-   * This might mean:
-
-     * Injecting an `InternalPlayerManager` into the `@main` `App` struct as a `@StateObject` or environment object, and calling `stop()` in `scenePhase == .background` or similar.
-     * Or using an app-level coordinator/singleton—whatever fits the existing architecture best.
-
-Do **not** add any SwiftUI buttons yet in Stage 1; just create the manager and lifecycle hook.
-
----
-
-### Stage 2 – Wire to Spotify Auth and add simple UI controls
-
-After Stage 1 is complete and I say “Please proceed with Stage 2”:
-
-1. **Integration with existing Spotify auth**:
-
-   * Identify the best place to request a valid Spotify token using the existing auth service.
-
-     * It could be:
-
-       * A settings view where the user clicks “Start Internal Player”.
-       * A top-level control in a sidebar.
-   * When the user chooses to start the internal player:
-
-     * Call something like:
-
+   - **Dev path correctness pattern**  
+     There should be:
+     - A single, clearly named **dev-only constant** for the local Electron repo path:
        ```swift
-       let token = try await spotifyAuthService.getValidAccessToken()
-       try await internalPlayerManager.start(withAccessToken: token)
+       static let defaultDevRepoPath = "/CHANGE/ME/absolute/path/to/electric-slideshow-internal-player"
        ```
-     * If there is an error, show a simple alert or console log, depending on how the app currently handles errors.
+       or similar, with a `// TODO` comment that I will edit.
+     - No hard-coded paths scattered around in multiple places.
 
-2. **UI controls**:
+   - **Process environment wiring**  
+     In dev mode, the `Process` should:
+     - Use `currentDirectoryURL` pointing at the Electron repo root.
+     - Set `SPOTIFY_ACCESS_TOKEN` in the environment (either via `process.environment` or `"SPOTIFY_ACCESS_TOKEN=..."` in the arguments).
+     - Run a clear command like `npm run dev`.
 
-   * Add a small, clear UI fragment (wherever makes sense in the app) that shows:
+     Prefer a single, readable implementation, for example:
 
-     * A “Start Internal Player” button (or toggle).
-     * A “Stop Internal Player” button, or, if you use a toggle, starting and stopping should be logically wired to the toggle.
-     * A simple status label bound to `isRunning`:
+     ```swift
+     var env = ProcessInfo.processInfo.environment
+     env["SPOTIFY_ACCESS_TOKEN"] = token
+     process.environment = env
+     process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+     process.arguments = ["npm", "run", "dev"]
+     ```
 
-       * “Internal Player Status: Running” or “Not Running”.
-   * Keep styling minimal; just make it obvious and functional.
+   - **Token logging hygiene**  
+     Make sure we never log the full token:
+     - Use `token.prefix(8)` or similar in logs.
+     - Fix any logs that might print the entire token.
 
-3. **Error handling**:
+   - **Process lifecycle**  
+     - `isRunning` should reflect `process?.isRunning`.
+     - `stop()` should call `terminate()` (and optionally wait) and clear the stored `process`.
+     - A `terminationHandler` (if present) should log and null out the process reference.
+   
+   - **Bundled mode stub**  
+     If there is a `.bundled` or similar launch mode:
+     - It should compile.
+     - It’s okay if it just logs a TODO and returns for now, but it should **not** crash.
 
-   * If starting fails (e.g., missing Electron project directory), log a clear error and update some simple error string for the UI if appropriate.
-   * Prefer not to crash the app; just show that the internal player could not be started.
+3. Add small, clear `print` logs if anything important is missing, e.g.:
+
+   ```swift
+   print("[InternalPlayerManager] Starting internal player in dev mode at \(localRepoURL.path)")
+   print("[InternalPlayerManager] Using token prefix: \(token.prefix(8))…")
+   print("[InternalPlayerManager] Process launched with PID \(process.processIdentifier)")
+   print("[InternalPlayerManager] Stopping internal player (PID: \(process.processIdentifier))")
+  ```
+
+Keep it concise and consistent.
+
+### Task 2 – Ensure there’s a simple debug UI to start/stop the internal player
+
+If there is already a UI element wired up to start/stop the internal player using a real token, **validate it and only adjust it if necessary**.
+
+If there is **no** such UI yet (or it’s buried / awkward), then:
+
+1. Create a small, obviously “dev” SwiftUI view, for example `InternalPlayerDebugView`, somewhere reasonable like:
+
+   * `Electric_Slideshow/Debug/InternalPlayerDebugView.swift`, or
+   * Next to other debug or settings views.
+
+2. This view should:
+
+   * Have access to:
+
+     * `SpotifyAuthService` (or whatever type can provide `getValidAccessToken()`).
+     * `InternalPlayerManager` (or protocol injection via `InternalPlayerControlling`).
+
+   * Show:
+
+     * A “Start Internal Player” button.
+     * A “Stop Internal Player” button.
+     * A simple status text: “Internal Player Status: Running / Not Running”.
+
+   * Behavior:
+
+     * When “Start” is tapped:
+
+       * Call `getValidAccessToken()` to obtain a token (using the existing auth service).
+       * Call `internalPlayerManager.start(withAccessToken: token)`.
+       * Handle errors by printing to console and optionally updating a small `errorMessage` string displayed in the view.
+     * When “Stop” is tapped:
+
+       * Call `internalPlayerManager.stop()`.
+
+   * Keep styling minimal — this is a debug tool, not a polished user-facing setting.
+
+3. Expose this debug view in some way that’s easy for me to reach in a dev build, for example:
+
+   * A “Debug” section in your main navigation, or
+   * A temporary entry in a sidebar / tab / menu.
+
+   It’s fine if this is clearly dev-only; I can hide it later.
+
+### Task 3 – Add a Markdown testing checklist
+
+Create a new file in the repo root (or under `Docs/`) named:
+
+* `INTERNAL_PLAYER_TESTING.md`
+
+Populate it with a **clear, step-by-step manual testing guide** for me. It should include at least:
+
+1. **Electron repo prep (one-time)**
+
+   * `cd` into `electric-slideshow-internal-player`.
+   * Run `npm install`.
+   * Confirm that `npm run dev` works when run manually (Electron window opens).
+
+2. **Swift app configuration (one-time)**
+
+   * Edit `InternalPlayerManager.defaultDevRepoPath` to the actual absolute path to the Electron repo.
+   * Ensure the Spotify app credentials and redirect URIs are configured correctly for the macOS app (you can mention this at a high level; no secrets).
+
+3. **Running the integrated dev stack**
+
+   * In Xcode, run `Electric Slideshow` in Debug.
+   * Log into Spotify through the app if needed so that a valid token is available.
+
+4. **Using the debug UI (InternalPlayerDebugView or equivalent)**
+
+   * Navigate to the internal player debug UI.
+
+   * Press “Start Internal Player”:
+
+     * Expect Xcode console logs:
+
+       * Internal player starting (dev mode).
+       * Token prefix.
+       * Process PID.
+     * Expect the Electron dev window to appear.
+     * In the Electron window, the internal player UI should show connected/initializing status.
+
+   * Open the Spotify client (desktop or mobile), and:
+
+     * Look for a device named “Electric Slideshow Internal Player” (or whatever name is configured in the Electron app).
+     * Transfer playback to that device.
+     * Confirm audio plays through the internal player environment (however you’ve configured sound output).
+
+   * Press “Stop Internal Player”:
+
+     * Expect the Electron window to close and logs indicating the process stopped.
+     * Confirm that `isRunning` updates to false.
+
+5. **App lifecycle check**
+
+   * With the internal player running, quit Electric Slideshow entirely.
+   * Confirm:
+
+     * Electron window closes.
+     * No stray Node/Electron processes remain (you can mention `Activity Monitor` or `ps`).
+   * Re-launch Electric Slideshow and verify you can start the internal player again.
+
+6. **Common failure modes**
+
+   * If the Electron repo path is wrong:
+
+     * Expected Swift log message.
+   * If Spotify auth fails:
+
+     * Expected message or error string in the debug UI.
+   * If the internal player crashes:
+
+     * What logs to look at (Xcode vs Electron terminal).
+
+The goal of this doc is: if Future Me comes back in 3 months, I can follow `INTERNAL_PLAYER_TESTING.md` line-by-line and get the internal player working again.
 
 ---
 
-### Stage 3 – Light polish & docs (Swift side only)
+## How to Respond
 
-If/when we get to Stage 3:
+1. First, perform the sanity check and minimal code tweaks (Tasks 1 and 2).
+2. Then create `INTERNAL_PLAYER_TESTING.md` with the manual testing instructions.
+3. In your response, summarize:
 
-* Add a short comment block or small Markdown section in the repo describing:
-
-  * How to run the internal player in development:
-
-    * “Make sure `../electric-slideshow-internal-player` exists and has `npm install` run at least once.”
-    * Then in the app: click “Start Internal Player”.
-  * That the Electron side expects `SPOTIFY_ACCESS_TOKEN` and will auto-use it on startup.
-* Add any minor refinements to logging or configuration paths as needed.
-
----
-
-## How to proceed now
-
-1. For your **first response**, please:
-
-   * Create the `INTERNAL_PLAYER_SWIFT_PLAN.md` file for Stage 0.
-   * Don’t modify any Swift code yet.
-   * Summarize where you intend to place `InternalPlayerManager`, how you’ll hook into app lifecycle, and where you’ll put the UI controls.
-
-2. Once I review that plan, I will say:
-
-   * **“Please proceed with Stage 1.”**
-   * At that point, implement Stage 1 exactly as described above.
+   * Which files you inspected and changed.
+   * The shape of the debug UI you added or validated.
+   * The key steps from `INTERNAL_PLAYER_TESTING.md`.
 
 Remember:
 
-* No tests.
-* Prefer clarity and explicitness over clever abstractions.
-* Don’t overcomplicate IPC yet; just launching Electron with `SPOTIFY_ACCESS_TOKEN` is enough for v1.
+* Do **not** add tests.
+* Do **not** introduce new, heavy abstractions.
+* Keep changes minimal, explicit, and focused on testability and clarity.
+
+---
+
+## 2. How *you* test it (high-level checklist)
+
+Once Roo has done the above and committed its changes (or you’ve reviewed them):
+
+1. **Prep Electron once**
+   - `cd /path/to/electric-slideshow-internal-player`
+   - `npm install`
+   - Optionally: run `npm run dev` manually once to make sure it launches.
+
+2. **Set the dev path in Swift**
+   - Open `InternalPlayerManager.swift` (or whatever it’s called).
+   - Set `defaultDevRepoPath` to your actual path, e.g.:
+     ```swift
+     static let defaultDevRepoPath = "/Users/joshlevy/Projects/electric-slideshow-internal-player"
+     ```
+   - Build to make sure it compiles.
+
+3. **Run Electric Slideshow (Xcode)**
+   - Run the app in Debug.
+   - Make sure your Spotify auth flow completes so `getValidAccessToken()` returns a real token.
+
+4. **Open the internal player debug UI**
+   - Whatever Roo created (e.g. `InternalPlayerDebugView`), navigate to it.
+   - You should see:
+     - Status text (“Not Running”).
+     - Start/Stop buttons.
+
+5. **Start the internal player**
+   - Click “Start Internal Player”.
+   - Watch Xcode console:
+     - `[InternalPlayerManager] Starting internal player in dev mode at …`
+     - `Using token prefix: …`
+     - `Process launched with PID …`
+   - A terminal window for `npm run dev` may open or log to the Xcode console only, depending on setup.
+   - An Electron window from the internal player app should pop up.
+
+6. **Verify Spotify device**
+   - Open Spotify on your Mac or phone.
+   - In the device list, look for “Electric Slideshow Internal Player” (or whatever you named it in the Electron renderer).
+   - Transfer playback to that device.
+   - Confirm audio plays.
+
+7. **Stop the internal player**
+   - Click “Stop Internal Player” in the debug UI.
+   - Electron window should close.
+   - Xcode console should show a “Stopping internal player” log.
+   - Status flips to “Not Running.”
+
+8. **Quit the app**
+   - With internal player running, quit Electric Slideshow entirely.
+   - Confirm Electron shuts down too (no stray processes in Activity Monitor).
+
+If any step is weird (e.g. no Electron window, device not appearing, etc.), copy the relevant logs and we can debug the specific failure mode together.
+
+That should give you exactly what you asked: a Roo prompt to audit + wire things cleanly, and a concrete path for you to prove the whole stack is behaving end-to-end.
+::contentReference[oaicite:0]{index=0}
+

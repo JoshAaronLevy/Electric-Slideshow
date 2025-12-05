@@ -3,7 +3,7 @@
 //  Electric Slideshow
 //
 //  Central place to decide which music playback backend to use
-//  (external Spotify device vs internal web player).
+//  (external Spotify device vs Electron-based internal player).
 //
 
 import Foundation
@@ -13,8 +13,7 @@ enum PlaybackBackendMode {
     /// Use the existing external device control via Spotify Web API.
     case externalDevice
 
-    /// Use the internal web player (Spotify Web Playback SDK inside WKWebView).
-    /// NOTE: currently still experimental / skeleton.
+    /// Use the Electron-based internal player managed by InternalPlayerManager.
     case internalWebPlayer
 }
 
@@ -24,18 +23,23 @@ struct PlaybackBackendFactory {
     /// until the internal player is fully implemented and tested.
     static let defaultMode: PlaybackBackendMode = .internalWebPlayer
 
-    /// Cached internal backend so we can pre-warm the web player once and reuse it.
+    /// Cached internal backend so we can reuse the same instance.
     private static var sharedInternalBackend: SpotifyInternalPlaybackBackend?
+    
+    /// Shared InternalPlayerManager instance
+    private static var sharedPlayerManager: InternalPlayerManager?
 
     /// Creates a music playback backend for the given mode.
     ///
     /// - Parameters:
     ///   - mode: Which backend mode to use. Defaults to `defaultMode`.
     ///   - spotifyAPIService: Your existing SpotifyAPIService instance.
+    ///   - spotifyAuthService: Your existing SpotifyAuthService instance.
     /// - Returns: A `MusicPlaybackBackend` or `nil` if it cannot be created.
     static func makeBackend(
         mode: PlaybackBackendMode = defaultMode,
-        spotifyAPIService: SpotifyAPIService?
+        spotifyAPIService: SpotifyAPIService?,
+        spotifyAuthService: SpotifyAuthService = .shared
     ) -> MusicPlaybackBackend? {
         guard let apiService = spotifyAPIService else {
             // No Spotify service → no backend.
@@ -48,26 +52,47 @@ struct PlaybackBackendFactory {
             return SpotifyExternalPlaybackBackend(apiService: apiService)
 
         case .internalWebPlayer:
-            // Internal web player: runs the Spotify Web Playback SDK in a WKWebView.
-            // Still experimental; commands are wired through InternalSpotifyPlayer.
+            // Electron-based internal player managed by InternalPlayerManager.
             if let cached = sharedInternalBackend {
                 return cached
             }
-            let internalPlayer = InternalSpotifyPlayer()
-            let backend = SpotifyInternalPlaybackBackend(player: internalPlayer, apiService: apiService)
+            
+            // Create or reuse the player manager
+            let playerManager = sharedPlayerManager ?? InternalPlayerManager()
+            sharedPlayerManager = playerManager
+            
+            let backend = SpotifyInternalPlaybackBackend(
+                playerManager: playerManager,
+                apiService: apiService,
+                authService: spotifyAuthService
+            )
             sharedInternalBackend = backend
             return backend
         }
     }
 
     /// Pre-warm the internal player so it can be ready before a slideshow starts.
-    /// This does not start playback; it only initializes the WKWebView + SDK.
+    /// This starts the Electron process with a valid Spotify token.
     @discardableResult
-    static func prewarmInternalBackend(spotifyAPIService: SpotifyAPIService?) -> MusicPlaybackBackend? {
+    static func prewarmInternalBackend(
+        spotifyAPIService: SpotifyAPIService?,
+        spotifyAuthService: SpotifyAuthService = .shared
+    ) -> MusicPlaybackBackend? {
         guard let apiService = spotifyAPIService else { return nil }
-        if let cached = sharedInternalBackend { return cached }
-        let internalPlayer = InternalSpotifyPlayer()
-        let backend = SpotifyInternalPlaybackBackend(player: internalPlayer, apiService: apiService)
+        
+        if let cached = sharedInternalBackend {
+            return cached
+        }
+        
+        // Create or reuse the player manager
+        let playerManager = sharedPlayerManager ?? InternalPlayerManager()
+        sharedPlayerManager = playerManager
+        
+        let backend = SpotifyInternalPlaybackBackend(
+            playerManager: playerManager,
+            apiService: apiService,
+            authService: spotifyAuthService
+        )
         sharedInternalBackend = backend
         backend.initialize()
         return backend
