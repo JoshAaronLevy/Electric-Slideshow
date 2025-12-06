@@ -1,6 +1,6 @@
 # Internal Player Embedding
 
-- Build `ElectricSlideshowInternalPlayer.app` from the `electric-slideshow-internal-player` Electron project.
+- Build `ElectricSlideshowInternalPlayer.app` from the `electric-slideshow-spotify-player` Electron project.
 - Add the helper app to the main target with a Copy Files phase so it ends up at `Electric Slideshow.app/Contents/Resources/ElectricSlideshowInternalPlayer.app`.
 - `InternalPlayerManager` resolves the executable at:
 

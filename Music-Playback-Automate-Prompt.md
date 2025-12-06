@@ -1,6 +1,6 @@
 ### Context & Problem
 
-This project is a macOS SwiftUI app called **Electric Slideshow**. It has an **internal Spotify player** implemented as an Electron app (`electric-slideshow-internal-player`) that uses the Spotify Web Playback SDK and appears as a Spotify Connect device (e.g. “Electric Slideshow Internal Player”).
+This project is a macOS SwiftUI app called **Electric Slideshow**. It has an **internal Spotify player** implemented as an Electron app (`electric-slideshow-spotify-player`) that uses the Spotify Web Playback SDK and appears as a Spotify Connect device (e.g. “Electric Slideshow Internal Player”).
 
 Architecture:
 

@@ -36,9 +36,9 @@ final class InternalPlayerManager: ObservableObject {
     
     // MARK: - Configuration
     
-    /// TODO: Edit this to point to your local electric-slideshow-internal-player repo
-    /// Example: "/Users/yourname/Projects/electric-slideshow-internal-player"
-    static let defaultDevRepoPath = "/Users/joshlevy/Desktop/electric-slideshow-internal-player"
+    /// TODO: Edit this to point to your local electric-slideshow-spotify-player repo
+    /// Example: "/Users/yourname/Projects/electric-slideshow-spotify-player"
+    static let defaultDevRepoPath = "/Users/joshlevy/Desktop/electric-slideshow-spotify-player"
     
     static let shared = InternalPlayerManager()
     

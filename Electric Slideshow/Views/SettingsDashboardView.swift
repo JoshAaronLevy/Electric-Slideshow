@@ -277,7 +277,7 @@ struct InternalPlayerDebugSheet: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("About")
                         .font(.headline)
-                    Text("This launches the Electron-based internal player from your local development repository. Make sure you've run `npm install` in the electric-slideshow-internal-player directory first.")
+                    Text("This launches the Electron-based internal player from your local development repository. Make sure you've run `npm install` in the electric-slideshow-spotify-player directory first.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
